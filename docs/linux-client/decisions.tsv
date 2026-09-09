@@ -1,0 +1,8 @@
+id	date	decision	why	revisit
+D1	2026-09-09	Bake enumerates the whole Data tree; coverage = parsed/total of files that exist	Armed goal is 100% corpus coverage, not a 2–3 map slice. Missing catalog slots are listed, never invented.	When a real client Data pack is attached, re-run bake and treat ImageDecodePercent as the gate metric.
+D2	2026-09-09	Client runtime stays .Lib; WIL/WZL/WTL are bake/editor inputs	Matches Client/MirGraphics/MLibrary.cs. Inventing a second runtime loader would fork protocol-adjacent content.	If a private server still ships raw WIL only, bake must convert before Client.Linux can draw.
+D3	2026-09-09	IRenderer + SlimDX adapter instead of deleting D3D9 this PR	Smallest lever: MLibrary draws move off Sprite.Draw while GameScene RTs still compile.	Next: RTs, CMain present loop, Line/Label locks.
+D4	2026-09-09	Silk.NET.OpenGL for the Linux backend	Pure .NET, Linux-viable, no native project. Windowing is optional; NullRenderer covers headless CI.	Vulkan/wgpu only if OpenGL drivers become the blocker.
+D5	2026-09-09	Client.Linux is the Linux compile target; Client.csproj stays net8.0-windows	WinForms + SlimDX + WebView2 + NAudio cannot compile on Linux without a language/UI rewrite (explicitly later).	After RTs and input land, fold scenes into Client.Linux rather than ifdeffing every form.
+D6	2026-09-09	RGBA PNG + BC3 sidecar, not a content-cut pack	GPU-friendly compression exists as a lever; PNG remains the readable fallback.	Swap range-fit BC3 for a higher-quality encoder if banding shows on UI.
+D7	2026-09-09	No C++/Rust rewrite this phase	Goal text: language rewrite only after bake+render land.	Revisit after Linux login→equip gate.

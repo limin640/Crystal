@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Crystal.Bake</RootNamespace>
+    <AssemblyName>crystal-bake</AssemblyName>
+    <Description>Enumerate a Crystal Data tree, parse WIL/WZL/WTL/Lib, emit atlases and coverage.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Crystal.Assets\Crystal.Assets.csproj" />
+  </ItemGroup>
+
+</Project>

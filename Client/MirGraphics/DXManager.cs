@@ -1,6 +1,7 @@
 ﻿using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using Client.MirControls;
+using Client.MirGraphics.Rendering;
 using Client.MirScenes;
 using SlimDX;
 using SlimDX.Direct3D9;
@@ -39,6 +40,9 @@ namespace Client.MirGraphics
         public static PixelShader MagicPixelShader;
 
         public static bool GrayScale;
+
+        /// <summary>Cross-platform draw backend. SlimDX on Windows; OpenGL/Null on Linux.</summary>
+        public static Crystal.Graphics.IRenderer Renderer;
 
         public static Point[] LightSizes =
         {
@@ -92,6 +96,18 @@ namespace Client.MirGraphics
 
             LoadTextures();
             LoadPixelsShaders();
+            BindRenderer();
+        }
+
+        static void BindRenderer()
+        {
+            if (Renderer is SlimDXRenderer existing)
+            {
+                existing.Rebind(Device, Sprite, Settings.ScreenWidth, Settings.ScreenHeight);
+                return;
+            }
+
+            Renderer = new SlimDXRenderer(Device, Sprite, Settings.ScreenWidth, Settings.ScreenHeight);
         }
 
         private static unsafe void LoadPixelsShaders()
@@ -147,6 +163,7 @@ namespace Client.MirGraphics
                 PoisonDotBackground.UnlockRectangle(0);
             }
             CreateLights();
+            BindRenderer();
         }
 
         private unsafe static void CreateLights()
@@ -251,7 +268,33 @@ namespace Client.MirGraphics
 
         public static void Draw(Texture texture, Rectangle? sourceRect, Vector3? position, Color4 color)
         {
-            Sprite.Draw(texture, sourceRect, Vector3.Zero, position, color);
+            if (Renderer is SlimDXRenderer slim)
+                slim.DrawLegacy(texture, sourceRect, position, color);
+            else
+                Sprite.Draw(texture, sourceRect, Vector3.Zero, position, color);
+            CMain.DPSCounter++;
+        }
+
+        public static void Draw(Crystal.Graphics.IGpuTexture texture, Rectangle? sourceRect, float x, float y, Color color)
+        {
+            int w = sourceRect?.Width ?? texture.Width;
+            int h = sourceRect?.Height ?? texture.Height;
+            Draw(texture, sourceRect, x, y, w, h, color, 1f);
+        }
+
+        public static void DrawOpaque(Crystal.Graphics.IGpuTexture texture, Rectangle? sourceRect, float x, float y, Color color, float opacity)
+        {
+            int w = sourceRect?.Width ?? texture.Width;
+            int h = sourceRect?.Height ?? texture.Height;
+            Draw(texture, sourceRect, x, y, w, h, color, opacity);
+        }
+
+        public static void Draw(Crystal.Graphics.IGpuTexture texture, Rectangle? sourceRect, float x, float y, float w, float h, Color color, float opacity)
+        {
+            if (texture == null || texture.IsDisposed || Renderer == null)
+                return;
+
+            Renderer.DrawQuad(texture, sourceRect, x, y, w, h, color, opacity);
             CMain.DPSCounter++;
         }
 
@@ -585,6 +628,9 @@ namespace Client.MirGraphics
             NormalPixelShader?.Dispose();
             GrayScalePixelShader?.Dispose();
             MagicPixelShader?.Dispose();
+
+            Renderer?.Dispose();
+            Renderer = null;
         }
     }
 }

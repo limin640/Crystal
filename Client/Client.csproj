@@ -43,6 +43,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\Crystal.Graphics\Crystal.Graphics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
