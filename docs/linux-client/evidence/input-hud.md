@@ -168,6 +168,22 @@ TradeHandshake=True TradeDone=True
 
 **Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `trades=0 TradeDone=False`. Restart Server.Linux first if Jev `MaxIP=5` just counted the pair.
 
+## Inventory bag move — C.MoveItem (same VM, later)
+
+`--no-gate --input-script Drag` auto-picks first bag item → first empty non-belt slot. Same `C.MoveItem` as `MirItemCell`. **EXIT:0**
+
+```
+input MoveItem Grid=Inventory from=0 to=7 name=(HP)DrugSmall
+S.MoveItem Success=True from=0 to=7
+drag evidence: MoveItem (HP)DrugSmall slot 0→7
+hud-bag slot=7 name=(HP)DrugSmall x1
+  hud-drag MoveItem (HP)DrugSmall slot 0→7
+```
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `drags=0`.
+
+Mouse-drag chrome (SelectedCell ghost, WIL icons, click-to-drop) stays deferred. `C.MergeItem` is wired (`Merge:from,to`).
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed.
+86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio WASAPI/WaveOut — no Linux backend in this tree), WebView2 (WinForms Evergreen — no Linux runtime), mouse-drag chrome, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed.

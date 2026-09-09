@@ -312,7 +312,7 @@ FightHit=True LootOk=True EquipOk=True
   input   : talks=0 buys=0 sells=0 BuyOk=False SellOk=False
 ```
 
-Player trade evidence is in the next section. Inventory drag-drop, audio, WebView2 stay deferred. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
+Player trade evidence is in the next section. Mouse-drag chrome, audio, and WebView2 stay deferred. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
 
 ### Player trade — two Client.Linux sessions (2026-09-09, same VM)
 
@@ -360,7 +360,7 @@ hud draws: … minimap=817 total=1246
 
 **Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `chats=0 ChatSent=0`, minimap still `700x700 draws=819`.
 
-`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest/drag-drop/audio/WebView2 stay deferred.
+`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest/mouse-drag chrome/audio/WebView2 stay deferred.
 
 ### Inventory / equip HUD (2026-09-09, same VM)
 
@@ -388,6 +388,34 @@ hud draws: inv=50 equip=136 belt=25 skill=30 chat=130 total=462
 ```
 
 Skill stubs drew (`skill=30`) with `skills=0` — Warrior has no `ClientMagic` yet; no invented icons. Catalog **86** still pack-missing.
+
+### Inventory bag move (2026-09-09, same VM)
+
+Same packet as `MirItemCell`: `C.MoveItem` `{ Grid = Inventory, From, To }`. Token `Drag` / `Drag:0,8` (map teleport stays `Move:x:y`). No WIL icons; HUD slot list refreshes.
+
+**Input-script** `--no-gate --input-script Drag`: **EXIT:0**
+
+```
+input MoveItem Grid=Inventory from=0 to=7 name=(HP)DrugSmall uid=6 dest=-
+S.MoveItem Success=True grid=Inventory from=0 to=7
+drag evidence: MoveItem (HP)DrugSmall slot 0→7
+hud drag: ok=True moves=1 MoveItem (HP)DrugSmall slot 0→7
+  hud-bag slot=6 name=WoodenSword x1
+  hud-bag slot=7 name=(HP)DrugSmall x1
+  hud-drag MoveItem (HP)DrugSmall slot 0→7
+```
+
+**Hard-gate** (no `--input-script`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=60089 by self
+  loot  : PickUp ground (HP)DrugSmall
+  equip : EquipItem Success slot=Weapon name=WoodenSword
+  input   : drags=0 DragOk=False
+```
+
+Mouse-drag chrome (SelectedCell ghost, WIL item icons, click-to-drop) stays deferred. `C.MergeItem` is wired (`Merge:from,to`) for stackables.
 
 ## Remaining gaps (OK to defer)
 
