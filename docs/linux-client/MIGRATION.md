@@ -2,7 +2,7 @@
 
 ## Sequencing toward the hard done gate
 
-Hard-gate **verbs** (login → select → walk → fight → loot → equip) are evidenced on Linux vs `Server.Linux` + Shared packets. Silk.NET input + a minimum IRenderer HUD are **in progress**. Full WinForms `GameScene`, audio, and WebView2 remain deferred. Language rewrite remains deferred.
+Hard-gate **verbs** (login → select → walk → fight → loot → equip) are evidenced on Linux vs `Server.Linux` + Shared packets. Silk.NET input + a minimum IRenderer HUD are **in progress**. Full WinForms `GameScene` and WebView2 remain deferred. Audio is `IAudio` (OpenAL / Null). Language rewrite remains deferred.
 
 This PR lands the bake/renderer levers **and** the Linux verb path. It does not vendor Data, Jev, or bake atlases.
 
@@ -19,7 +19,7 @@ Data tree (WIL/WZL/WTL/Lib)
         ▼
  Client.Linux: Shared packets + Silk.NET input/HUD + MapView (IRenderer)
  Server.Linux: full Jev --root (Maps + Server.MirDB) without --listen-without-world
- deferred: full WinForms GameScene, audio, WebView2
+ deferred: full WinForms GameScene, WebView2 (Windows-only)
 ```
 
 ## Design choices
@@ -199,7 +199,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Quest panel | **In progress** only as names from `S.NewQuestInfo` if they arrive; no accept/turn-in UI |
 | Player trade | **In progress** — two Client.Linux processes (`docs/linux-client/trade-two-process.sh`). `C.ChangeTrade` / `C.TradeRequest` / `C.TradeReply` / `C.TradeGold` / `C.DepositTradeItem` / `C.TradeConfirm` + matching `S.*`. Players must face each other. |
 | Inventory bag move (`C.MoveItem` / `C.MergeItem`) | **In progress** — `--input-script Drag:0,8` / `Merge:from,to`; HUD slot refresh. Same packets as `MirItemCell` |
-| Mouse-drag chrome (SelectedCell ghost, WIL icons, click-to-drop) | Stub — deferred |
+| Mouse-drag chrome (SelectedCell ghost / click-to-drop) | **In progress** — IRenderer colored-quad ghost + source/dest highlight on `Drag`. Windowed left-click pick/drop on bag/belt if Silk.NET mouse coords exist. Headless keeps `Drag:from,to` tokens. **No WIL item icons** |
 | Magic targeting / skill icons (`MagIcon`) | Stub |
 | Mini-map WIL (`MMap.Lib`) / big map | Stub — no invented map art |
 | CMain keybind INI | Stub |
@@ -360,7 +360,7 @@ hud draws: … minimap=817 total=1246
 
 **Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `chats=0 ChatSent=0`, minimap still `700x700 draws=819`.
 
-`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest/mouse-drag chrome/WebView2 stay deferred.
+`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest accept/turn-in and WebView2 stay deferred. SelectedCell ghost is colored quads (no WIL icons).
 
 ### Inventory / equip HUD (2026-09-09, same VM)
 
@@ -415,7 +415,15 @@ FightHit=True LootOk=True EquipOk=True
   input   : drags=0 DragOk=False
 ```
 
-Mouse-drag chrome (SelectedCell ghost, WIL item icons, click-to-drop) stays deferred. `C.MergeItem` is wired (`Merge:from,to`) for stackables.
+`C.MergeItem` is wired (`Merge:from,to`) for stackables. SelectedCell ghost (next section) is colored quads only — no invented WIL icons.
+
+### Inventory SelectedCell ghost (2026-09-09, same VM)
+
+IRenderer overlay on bag/belt: gold source, cyan dest, floating quad. `hud-drag ghost=N` is the extra fill count (not WIL sprites). Windowed left-click pick/drop uses the same slot hit-test; headless keeps `Drag` / `Drag:from,to`.
+
+**Input-script** `--no-gate --input-script Drag`: evidence pending this run (ghost draw count + EXIT:0).
+
+**Hard-gate** (no `--input-script`): must stay **EXIT:0** with `drags=0` and `hud-drag ghost=0`.
 
 ### Linux audio — IAudio / OpenAL (2026-09-09, same VM)
 
@@ -437,14 +445,20 @@ FightHit=True LootOk=True EquipOk=True
 sound: backend=Null (headless) SoundPlayOk=False skipped=headless
 ```
 
-WebView2 stays Windows-only (no Linux stub). Mouse-drag chrome stays cosmetic deferred.
+WebView2 stays Windows-only (no Linux stub). WIL item icons stay pack-missing (catalog 86).
 
-## Remaining gaps (OK to defer)
+## Remaining residuals (checklist)
 
-1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
-2. **WebView2 / mouse-drag chrome** — WebView2 is Windows-only (WinForms Evergreen; no Linux runtime). Mouse-drag chrome stays cosmetic. Audio is `IAudio` (OpenAL / Null); Windows keeps NAudio. Quest accept stays stubbed.
-3. **Operator art** — floor/objects still catalog or `--data` `.Lib`; 86 catalog slots remain missing-on-disk. No invented WIL.
-4. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
+These do **not** block the hard-gate (login→select→walk→fight→loot→equip **EXIT:0**). Do not invent WIL/game art to close them.
+
+- [ ] **Full WinForms `GameScene`** — Client.Linux is Shared packets + `MapView` + IRenderer HUD, not a language rewrite of the scene graph / dialogs.
+- [ ] **WebView2** — Windows-only (WinForms Evergreen; no Linux runtime). Permanently deferred on Linux. `Client.Linux` must never reference it.
+- [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
+- [ ] **`MMap.Lib` / MagIcon tiles** — mini-map stays geometry; skill bar stays 8 stubs. No invented map or spell art.
+- [ ] **Quest accept / turn-in UI** — names from `S.NewQuestInfo` only; no `C.AcceptQuest` / complete flow.
+- [ ] **Windows `SoundManager` → `IAudio` fold** — Linux already uses Null / OpenAL. NAudio stays on the Windows client until GameScene lands.
+- [ ] **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
+- [ ] **Operator art / Data / Jev / Sound packs** — stay outside git. `--data` / `--maps` / `--sound` / `--root` point at external trees. Do not vendor bake atlases.
 
 The login→select→walk→fight→loot→equip **verbs** stay evidenced (do not regress). Input/HUD is the next fold toward GameScene, not a replacement of that proof.
 

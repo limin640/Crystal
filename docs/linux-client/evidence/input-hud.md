@@ -182,7 +182,13 @@ hud-bag slot=7 name=(HP)DrugSmall x1
 
 **Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `drags=0`.
 
-Mouse-drag chrome (SelectedCell ghost, WIL icons, click-to-drop) stays deferred. `C.MergeItem` is wired (`Merge:from,to`).
+`C.MergeItem` is wired (`Merge:from,to`). SelectedCell ghost is the next increment (colored quads, no WIL icons).
+
+## Inventory SelectedCell ghost (same VM, later)
+
+`--no-gate --input-script Drag` draws IRenderer gold/cyan overlays + a floating quad. Evidence line: `hud-drag ghost=N from=X to=Y`. Headless tokens unchanged. Windowed left-click pick/drop when Silk.NET mouse coords exist.
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `drags=0`, `hud-drag ghost=0`.
 
 ## Linux audio — IAudio / Silk.NET OpenAL (same VM, later)
 
@@ -203,4 +209,4 @@ Windows `SoundManager` stays NAudio. WebView2 is Windows-only (permanently defer
 
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime), mouse-drag chrome, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed. Do not vendor Sound packs; fixture wav is not game art.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons / `MMap.Lib` / MagIcon stay pack-missing. Quest accept/turn-in stays stubbed. Do not vendor Sound packs; fixture wav is not game art. See `MIGRATION.md` residuals checklist.

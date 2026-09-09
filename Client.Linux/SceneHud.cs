@@ -29,6 +29,17 @@ internal sealed class SceneHud : IDisposable
     public int EquipFilled { get; private set; }
     public int BeltFilled { get; private set; }
     public int SkillsFilled { get; private set; }
+    /// <summary>Extra IRenderer fills for SelectedCell / drop highlight / floating ghost (no WIL icons).</summary>
+    public int DragGhostDraws { get; private set; }
+
+    const int InvPanelInsetX = 292;
+    const int InvPanelY = 188;
+    const int InvCols = 8;
+    const int InvCellW = 34;
+    const int InvCellH = 16;
+    const int InvVisibleRows = 8;
+    const int BeltInsetX = 140;
+    const int BeltInsetY = 118;
 
     public SceneHud(IRenderer renderer)
     {
@@ -86,6 +97,7 @@ internal sealed class SceneHud : IDisposable
         Text(width - 280, height - 28, $"in {session.InputWalks} atk {session.InputAttacks} buy {session.InputBuys} sell {session.InputSells} G{session.UserGold}", Color.Silver);
         if (session.ChatComposing)
             Text(16, height - 72, $"> {session.ChatDraft}_", Color.Yellow);
+        DrawDragGhost(width, height, session);
     }
 
     public void WriteEvidence(CrystalSession session)
@@ -96,6 +108,7 @@ internal sealed class SceneHud : IDisposable
         Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count} gold={session.UserGold} bag={session.BagCount} buys={session.InputBuys} sells={session.InputSells} BuyOk={session.BuyOk} SellOk={session.SellOk}");
         Console.WriteLine($"hud trade: handshake={session.TradeHandshakeOk} done={session.TradeDone} partner={session.TradePartnerName ?? "-"} invite={session.TradeInviteFrom ?? "-"} goldSeen={session.TradeGoldSeen} deposit={session.TradeDepositOk}");
         Console.WriteLine($"hud drag: ok={session.DragOk} moves={session.InputDrags} merge={session.MergeOk} {session.DragEvidence ?? "-"}");
+        Console.WriteLine($"hud-drag ghost={DragGhostDraws} from={session.SelectedSlot} to={session.DragHoverSlot}");
         Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} minimap={MiniMapDraws} npc={NpcDraws} total={HudDraws}");
         for (int i = 0; i < session.InventorySlots.Count; i++)
         {
@@ -137,7 +150,81 @@ internal sealed class SceneHud : IDisposable
     void ResetCounts()
     {
         HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = MiniMapDraws = NpcDraws = 0;
-        MiniMapBlips = BagFilled = EquipFilled = BeltFilled = SkillsFilled = 0;
+        MiniMapBlips = BagFilled = EquipFilled = BeltFilled = SkillsFilled = DragGhostDraws = 0;
+    }
+
+    /// <summary>
+    /// Hit-test belt (0–5) then visible bag cells. Windowed click-to-drop; headless keeps Drag tokens.
+    /// </summary>
+    public bool TryHitBagSlot(int width, int height, int mx, int my, out int slot)
+    {
+        int beltEnd = CrystalSession.BeltSlotCount;
+        for (int i = 0; i < beltEnd; i++)
+        {
+            if (TrySlotCell(width, height, i, out int x, out int y, out int w, out int h)
+                && mx >= x && mx < x + w && my >= y && my < y + h)
+            {
+                slot = i;
+                return true;
+            }
+        }
+        int bagEnd = beltEnd + InvCols * InvVisibleRows;
+        for (int i = beltEnd; i < bagEnd; i++)
+        {
+            if (TrySlotCell(width, height, i, out int x, out int y, out int w, out int h)
+                && mx >= x && mx < x + w && my >= y && my < y + h)
+            {
+                slot = i;
+                return true;
+            }
+        }
+        slot = -1;
+        return false;
+    }
+
+    static bool TrySlotCell(int width, int height, int slot, out int x, out int y, out int w, out int h)
+    {
+        x = y = w = h = 0;
+        if (slot < 0) return false;
+        if (slot < CrystalSession.BeltSlotCount)
+        {
+            int bx = width / 2 - BeltInsetX;
+            int by = height - BeltInsetY;
+            x = bx + 6 + slot * 44;
+            y = by + 16;
+            w = 40;
+            h = 16;
+            return true;
+        }
+        int i = slot - CrystalSession.BeltSlotCount;
+        if (i >= InvCols * InvVisibleRows) return false;
+        int px = width - InvPanelInsetX;
+        int py = InvPanelY;
+        x = px + 6 + (i % InvCols) * InvCellW;
+        y = py + 20 + (i / InvCols) * InvCellH;
+        w = InvCellW - 2;
+        h = InvCellH - 1;
+        return true;
+    }
+
+    void DrawDragGhost(int width, int height, CrystalSession session)
+    {
+        if (!session.ShowDragGhost && session.SelectedSlot < 0) return;
+        int from = session.SelectedSlot;
+        int to = session.DragHoverSlot;
+        if (from >= 0 && TrySlotCell(width, height, from, out int fx, out int fy, out int fw, out int fh))
+            GhostFill(fx, fy, fw, fh, Color.FromArgb(150, 220, 176, 40));
+        if (to >= 0 && TrySlotCell(width, height, to, out int tx, out int ty, out int tw, out int th))
+            GhostFill(tx, ty, tw, th, Color.FromArgb(150, 40, 200, 176));
+        int floatSlot = to >= 0 ? to : from;
+        if (floatSlot >= 0 && TrySlotCell(width, height, floatSlot, out int gx, out int gy, out _, out _))
+            GhostFill(gx + 6, gy - 8, 18, 10, Color.FromArgb(210, 240, 196, 56));
+    }
+
+    void GhostFill(int x, int y, int w, int h, Color color)
+    {
+        Fill(x, y, w, h, color);
+        DragGhostDraws++;
     }
 
     void DrawNpcPanel(int x, int y, CrystalSession session)
@@ -262,14 +349,14 @@ internal sealed class SceneHud : IDisposable
     void DrawInventoryPanel(int x, int y, CrystalSession session)
     {
         int before = HudDraws;
-        const int cols = 8;
-        const int cellW = 34;
-        const int cellH = 16;
+        const int cols = InvCols;
+        const int cellW = InvCellW;
+        const int cellH = InvCellH;
         var bag = session.InventorySlots;
         int bagStart = CrystalSession.BeltSlotCount;
         int bagSlots = Math.Max(0, bag.Count - bagStart);
         int rows = Math.Max(5, (int)Math.Ceiling(Math.Max(bagSlots, 40) / (double)cols));
-        rows = Math.Min(rows, 8);
+        rows = Math.Min(rows, InvVisibleRows);
         Fill(x, y, cols * cellW + 12, 22 + rows * cellH, Color.FromArgb(180, 12, 16, 24));
         Text(x + 6, y + 2, "INVENTORY", Color.PowderBlue);
         for (int i = 0; i < rows * cols; i++)

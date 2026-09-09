@@ -134,6 +134,11 @@ internal sealed class CrystalSession : IDisposable
     public bool MergeOk { get; private set; }
     public string? DragEvidence { get; private set; }
     public string? MergeEvidence { get; private set; }
+    /// <summary>Source bag slot for SelectedCell ghost (scripted Drag or windowed pick-up).</summary>
+    public int SelectedSlot { get; private set; } = -1;
+    /// <summary>Hover / drop bag slot while a drag is armed.</summary>
+    public int DragHoverSlot { get; private set; } = -1;
+    public bool ShowDragGhost { get; private set; }
     public const int BeltSlotCount = 6;
     public IReadOnlyList<UserItem?> InventorySlots => _inventory;
     public IReadOnlyList<UserItem?> EquipmentSlots => _equipment;
@@ -143,6 +148,23 @@ internal sealed class CrystalSession : IDisposable
     public int EquippedFilled => EquippedCount();
 
     public string DisplayName(UserItem item) => ItemName(item);
+
+    public void SelectSlot(int slot)
+    {
+        SelectedSlot = slot;
+        DragHoverSlot = -1;
+        ShowDragGhost = slot >= 0;
+    }
+
+    public void ClearSelection()
+    {
+        SelectedSlot = -1;
+        DragHoverSlot = -1;
+        ShowDragGhost = false;
+    }
+
+    public bool SlotOccupied(int slot)
+        => slot >= 0 && slot < _inventory.Length && _inventory[slot] != null;
 
     public void Connect(string host, int port, int timeoutMs = 5000)
     {
@@ -526,6 +548,10 @@ internal sealed class CrystalSession : IDisposable
             Note($"drag: slot {from} empty");
             return;
         }
+
+        SelectedSlot = from;
+        DragHoverSlot = to;
+        ShowDragGhost = true;
 
         string name = ItemName(_inventory[from]!);
         ulong uid = _inventory[from]!.UniqueID;

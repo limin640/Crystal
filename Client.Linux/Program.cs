@@ -174,6 +174,8 @@ internal static class Program
                 Console.WriteLine($"  trade   : {session.TradeEvidence}");
             if (session.DragEvidence != null)
                 Console.WriteLine($"  drag    : {session.DragEvidence}");
+            if (session.ShowDragGhost || session.InputDrags > 0)
+                Console.WriteLine($"  ghost   : from={session.SelectedSlot} to={session.DragHoverSlot}");
             if (session.MergeEvidence != null)
                 Console.WriteLine($"  merge   : {session.MergeEvidence}");
         }
@@ -321,6 +323,32 @@ internal static class Program
                         }
                         if (btn != MouseButton.Left) return;
                         var pos = mouse.Position;
+                        int mx = (int)pos.X;
+                        int my = (int)pos.Y;
+                        if (hud != null && hud.TryHitBagSlot(window.Size.X, window.Size.Y, mx, my, out int slot))
+                        {
+                            if (session.SelectedSlot < 0)
+                            {
+                                if (session.SlotOccupied(slot))
+                                {
+                                    session.SelectSlot(slot);
+                                    Console.WriteLine($"input mouse select slot={slot}");
+                                }
+                                else
+                                    Console.WriteLine($"input mouse bag miss-empty slot={slot}");
+                                return;
+                            }
+                            if (session.SelectedSlot == slot)
+                            {
+                                session.ClearSelection();
+                                Console.WriteLine($"input mouse deselect slot={slot}");
+                                return;
+                            }
+                            int from = session.SelectedSlot;
+                            session.Drive(GameCommand.Drag(from, slot));
+                            Console.WriteLine($"input mouse drop from={from} to={slot}");
+                            return;
+                        }
                         int cellX = session.UserLocation.X + (int)(pos.X / MapView.CellWidth) - (window.Size.X / MapView.CellWidth / 2);
                         int cellY = session.UserLocation.Y + (int)(pos.Y / MapView.CellHeight) - (window.Size.Y / MapView.CellHeight / 2);
                         var dest = new Point(cellX, cellY);
