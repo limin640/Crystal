@@ -16,6 +16,17 @@ internal sealed class SceneHud : IDisposable
     const int GlyphH = 6;
     const int Scale = 2;
 
+    public int HudDraws { get; private set; }
+    public int InventoryDraws { get; private set; }
+    public int EquipDraws { get; private set; }
+    public int BeltDraws { get; private set; }
+    public int SkillDraws { get; private set; }
+    public int ChatDraws { get; private set; }
+    public int BagFilled { get; private set; }
+    public int EquipFilled { get; private set; }
+    public int BeltFilled { get; private set; }
+    public int SkillsFilled { get; private set; }
+
     public SceneHud(IRenderer renderer)
     {
         _renderer = renderer;
@@ -42,8 +53,15 @@ internal sealed class SceneHud : IDisposable
 
     public void DrawGame(int width, int height, CrystalSession session)
     {
+        ResetCounts();
         Fill(8, 8, width - 16, 40, Color.FromArgb(190, 8, 10, 16));
         Text(16, 14, $"{session.MapTitle ?? "?"}  {session.UserName} Lv{session.UserLevel} {session.UserClass}  {session.UserLocation.X},{session.UserLocation.Y}  {session.Facing}  G{session.UserGold}", Color.White);
+
+        DrawEquipPanel(16, 56, session);
+        DrawInventoryPanel(width - 292, 56, session);
+        DrawBeltBar(width / 2 - 140, height - 118, session);
+        DrawSkillBar(16, height - 118, session);
+        DrawChatLog(16, height - 176, session);
 
         int barW = Math.Min(220, width / 3);
         int hp = session.UserHP;
@@ -60,16 +78,160 @@ internal sealed class SceneHud : IDisposable
             Fill(16, height - 32, (int)(barW * (mp / (float)mpMax)), 12, Color.FromArgb(255, 48, 96, 200));
         Text(16 + barW + 8, height - 34, $"MP {mp}/{mpMax}", Color.LightSteelBlue);
 
-        if (!string.IsNullOrWhiteSpace(session.LastChat))
-            Text(16, height - 72, session.LastChat, Color.Khaki);
-
         Text(width - 220, height - 28, $"in {session.InputWalks} atk {session.InputAttacks}", Color.Silver);
+    }
+
+    public void WriteEvidence(CrystalSession session)
+    {
+        Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
+        Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} total={HudDraws}");
+        for (int i = 0; i < session.InventorySlots.Count; i++)
+        {
+            var it = session.InventorySlots[i];
+            if (it == null) continue;
+            string belt = i < CrystalSession.BeltSlotCount ? " belt" : "";
+            Console.WriteLine($"  hud-bag slot={i}{belt} name={session.DisplayName(it)} x{it.Count}");
+        }
+        for (int i = 0; i < session.EquipmentSlots.Count; i++)
+        {
+            var it = session.EquipmentSlots[i];
+            if (it == null) continue;
+            Console.WriteLine($"  hud-equip slot={(EquipmentSlot)i} name={session.DisplayName(it)}");
+        }
+        foreach (var mag in session.Magics)
+            Console.WriteLine($"  hud-skill {mag.Name} spell={mag.Spell} lv={mag.Level} key={mag.Key}");
+        foreach (string line in session.ChatLines)
+            Console.WriteLine($"  hud-chat {line}");
+    }
+
+    void ResetCounts()
+    {
+        HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = 0;
+        BagFilled = EquipFilled = BeltFilled = SkillsFilled = 0;
+    }
+
+    void DrawEquipPanel(int x, int y, CrystalSession session)
+    {
+        int before = HudDraws;
+        Fill(x, y, 248, 18 + 14 * 16, Color.FromArgb(180, 20, 16, 12));
+        Text(x + 6, y + 2, "EQUIP", Color.Wheat);
+        var slots = session.EquipmentSlots;
+        int n = Math.Max(slots.Count, 14);
+        for (int i = 0; i < n && i < 14; i++)
+        {
+            var it = i < slots.Count ? slots[i] : null;
+            int rowY = y + 18 + i * 16;
+            Fill(x + 4, rowY, 240, 15, it == null ? Color.FromArgb(160, 28, 24, 20) : Color.FromArgb(200, 56, 40, 28));
+            string label = it == null
+                ? $"{(EquipmentSlot)i}"
+                : $"{(EquipmentSlot)i} {Clip(session.DisplayName(it), 16)}";
+            Text(x + 8, rowY + 1, label, it == null ? Color.DimGray : Color.White);
+            if (it != null) EquipFilled++;
+        }
+        EquipDraws = HudDraws - before;
+    }
+
+    void DrawInventoryPanel(int x, int y, CrystalSession session)
+    {
+        int before = HudDraws;
+        const int cols = 8;
+        const int cellW = 34;
+        const int cellH = 16;
+        var bag = session.InventorySlots;
+        int bagStart = CrystalSession.BeltSlotCount;
+        int bagSlots = Math.Max(0, bag.Count - bagStart);
+        int rows = Math.Max(5, (int)Math.Ceiling(Math.Max(bagSlots, 40) / (double)cols));
+        rows = Math.Min(rows, 8);
+        Fill(x, y, cols * cellW + 12, 22 + rows * cellH, Color.FromArgb(180, 12, 16, 24));
+        Text(x + 6, y + 2, "INVENTORY", Color.PowderBlue);
+        for (int i = 0; i < rows * cols; i++)
+        {
+            int slot = bagStart + i;
+            var it = slot < bag.Count ? bag[slot] : null;
+            int cx = x + 6 + (i % cols) * cellW;
+            int cy = y + 20 + (i / cols) * cellH;
+            Fill(cx, cy, cellW - 2, cellH - 1, it == null ? Color.FromArgb(150, 24, 28, 36) : Color.FromArgb(210, 48, 64, 80));
+            if (it != null)
+            {
+                Text(cx + 1, cy + 1, Clip(session.DisplayName(it), 4), Color.White);
+                BagFilled++;
+            }
+        }
+        InventoryDraws = HudDraws - before;
+    }
+
+    void DrawBeltBar(int x, int y, CrystalSession session)
+    {
+        int before = HudDraws;
+        const int n = CrystalSession.BeltSlotCount;
+        Fill(x, y, n * 44 + 8, 36, Color.FromArgb(190, 16, 20, 16));
+        Text(x + 4, y + 2, "BELT", Color.DarkSeaGreen);
+        var bag = session.InventorySlots;
+        for (int i = 0; i < n; i++)
+        {
+            var it = i < bag.Count ? bag[i] : null;
+            int cx = x + 6 + i * 44;
+            Fill(cx, y + 16, 40, 16, it == null ? Color.FromArgb(150, 28, 32, 28) : Color.FromArgb(210, 48, 72, 48));
+            string label = it == null ? $"{i + 1}" : $"{i + 1} {Clip(session.DisplayName(it), 3)}";
+            Text(cx + 2, y + 17, label, it == null ? Color.Gray : Color.White);
+            if (it != null)
+            {
+                BeltFilled++;
+                BagFilled++;
+            }
+        }
+        BeltDraws = HudDraws - before;
+    }
+
+    void DrawSkillBar(int x, int y, CrystalSession session)
+    {
+        int before = HudDraws;
+        const int n = 8;
+        Fill(x, y, n * 36 + 8, 36, Color.FromArgb(190, 16, 16, 28));
+        Text(x + 4, y + 2, "SKILL", Color.Plum);
+        for (int i = 0; i < n; i++)
+        {
+            ClientMagic? mag = i < session.Magics.Count ? session.Magics[i] : null;
+            int cx = x + 6 + i * 36;
+            Fill(cx, y + 16, 32, 16, mag == null ? Color.FromArgb(150, 28, 28, 40) : Color.FromArgb(210, 64, 48, 96));
+            string label = mag == null ? $"F{i + 1}" : Clip(string.IsNullOrWhiteSpace(mag.Name) ? mag.Spell.ToString() : mag.Name, 4);
+            Text(cx + 1, y + 17, label, mag == null ? Color.Gray : Color.White);
+            if (mag != null) SkillsFilled++;
+        }
+        SkillDraws = HudDraws - before;
+    }
+
+    void DrawChatLog(int x, int y, CrystalSession session)
+    {
+        int before = HudDraws;
+        var lines = session.ChatLines;
+        if (lines.Count == 0 && string.IsNullOrWhiteSpace(session.LastChat))
+        {
+            ChatDraws = 0;
+            return;
+        }
+        Fill(x, y, 420, 52, Color.FromArgb(160, 8, 8, 12));
+        var show = lines.Count > 0 ? lines : new[] { session.LastChat! };
+        int row = y + 2;
+        foreach (string line in show)
+        {
+            Text(x + 4, row, Clip(line, 50), Color.Khaki);
+            row += 12;
+        }
+        ChatDraws = HudDraws - before;
+    }
+
+    static string Clip(string text, int max)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        return text.Length <= max ? text : text[..max];
     }
 
     void Fill(int x, int y, int w, int h, Color color)
     {
         if (w <= 0 || h <= 0) return;
         _renderer.DrawQuad(_white, null, x, y, w, h, color);
+        HudDraws++;
     }
 
     void Text(int x, int y, string text, Color color)
@@ -80,6 +242,7 @@ internal sealed class SceneHud : IDisposable
             int idx = GlyphIndex(ch);
             var src = new Rectangle(idx * GlyphW, 0, GlyphW, GlyphH);
             _renderer.DrawQuad(_font, src, cx, y, GlyphW * Scale, GlyphH * Scale, color);
+            HudDraws++;
             cx += GlyphW * Scale;
         }
     }
@@ -99,13 +262,15 @@ internal sealed class SceneHud : IDisposable
             '(' => 42,
             ')' => 43,
             '?' => 44,
+            '#' => 45,
+            '+' => 46,
             _ => 36
         };
     }
 
     static IGpuTexture BuildFont(IRenderer renderer)
     {
-        const int count = 45;
+        const int count = 47;
         int w = GlyphW * count;
         var bgra = new byte[w * GlyphH * 4];
         void Plot(int gi, int px, int py)
@@ -173,6 +338,8 @@ internal sealed class SceneHud : IDisposable
             0b010_100_100_100_010, // (
             0b010_001_001_001_010, // )
             0b010_101_001_000_010, // ?
+            0b101_101_010_101_101, // #
+            0b010_010_111_010_010, // +
         ];
 
         for (int g = 0; g < bits.Length; g++)

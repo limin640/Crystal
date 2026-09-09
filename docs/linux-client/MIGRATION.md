@@ -179,7 +179,7 @@ Linux Release builds still green. Jev / Data stay outside git.
 
 Silk.NET windowed keyboard/mouse (WASD / arrows / numpad, Space/Ctrl attack, G pickup, left-click walk, right-click attack) drives **the same** `C.Walk` / `C.Attack` / `C.PickUp` packets as Crystal. Headless CI injects the same commands with `--input-script Right,Right,Attack`.
 
-Minimum **select** and **game HUD** (map title, loc, level/class/gold, HP/MP bars, last chat) draw through `IRenderer` — not WinForms. Procedural 3×5 HUD glyphs are UI chrome, not WIL art.
+Minimum **select** and **game HUD** draw through `IRenderer` — not WinForms: map/loc/level/class/gold, HP/MP, last 4 `S.Chat` lines, **inventory bag grid**, **equip slots**, **belt** (inventory 0–5, same as Crystal `BeltDialog`), and an 8-slot **skill stub** filled from `UserInformation.Magics` / `S.NewMagic`. Procedural 3×5 HUD glyphs are UI chrome, not WIL art.
 
 Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not invent art.
 
@@ -188,11 +188,15 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Piece | Status |
 | --- | --- |
 | `SelectScene` / `GameScene` dialog graph | Stub — HUD + packets only |
+| Inventory bag + equip slots | **In progress** — IRenderer panel from `UserInformation` / `GainedItem` / `EquipItem` |
+| Belt (inv 0–5) | **In progress** — IRenderer stub, Crystal `BeltDialog` slot map |
+| Skill bar | **In progress** — 8 stubs from `ClientMagic` (no MagIcon WIL, no targeting) |
+| Chat log | **In progress** — last 4 `S.Chat` lines (no input box) |
 | `MirMessageBox`, NPC/quest/trade windows | Stub |
-| Skill bar / magic targeting | Stub |
-| Inventory / equipment / belt windows | Stub (`C.EquipItem` still works) |
+| Magic targeting / skill icons (`MagIcon`) | Stub |
+| Inventory drag-drop / use-item clicks | Stub (`C.EquipItem` still works) |
 | Mini-map (`MMap.Lib`) / big map | Stub |
-| Chat input box / CMain keybind INI | Stub (last `S.Chat` line on HUD) |
+| Chat input box / CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
 | **Audio (NAudio)** | Deferred — do not block |
 | **WebView2** | Deferred — do not block |

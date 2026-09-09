@@ -153,8 +153,11 @@ internal static class Program
             Console.WriteLine($"  floor   : {mapView.FloorDraws} objectDraws={mapView.ObjectDraws} skipped={mapView.SkippedCells} lowFi={mapView.LowFiRemaps}");
         }
         if (session != null)
+        {
             Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups}");
-        Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer HUD.");
+            Console.WriteLine($"  items   : bag={session.BagCount} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
+        }
+        Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
         mapView?.Dispose();
         catalog?.Dispose();
         return 0;
@@ -201,6 +204,7 @@ internal static class Program
         }
 
         Console.WriteLine($"in-map draw: file={session.MapFileName} title={session.MapTitle} origin={session.UserLocation.X},{session.UserLocation.Y} objects={objects.Count}");
+        hud?.WriteEvidence(session);
         _ = catalog;
         return true;
     }
@@ -337,6 +341,8 @@ internal static class Program
             };
 
             window.Run();
+            if (hud != null && session != null)
+                hud.WriteEvidence(session);
             Console.WriteLine($"Client.Linux windowed OK frames={frameCount} backend={renderer?.BackendName}");
             return 0;
         }

@@ -35,7 +35,10 @@ internal sealed class CrystalSession : IDisposable
     readonly Dictionary<uint, WorldObject> _objects = new();
     readonly Dictionary<int, ItemInfo> _itemInfos = new();
     readonly Dictionary<ulong, UserItem> _bag = new();
+    UserItem?[] _inventory = Array.Empty<UserItem?>();
     UserItem?[] _equipment = Array.Empty<UserItem?>();
+    readonly List<ClientMagic> _magics = new();
+    readonly List<string> _chatLines = new();
     readonly List<GroundLoot> _ground = new();
     int _attacksSent;
     uint _fightTargetId;
@@ -83,6 +86,15 @@ internal sealed class CrystalSession : IDisposable
     public int InputWalks { get; private set; }
     public int InputAttacks { get; private set; }
     public int InputPickups { get; private set; }
+    public const int BeltSlotCount = 6;
+    public IReadOnlyList<UserItem?> InventorySlots => _inventory;
+    public IReadOnlyList<UserItem?> EquipmentSlots => _equipment;
+    public IReadOnlyList<ClientMagic> Magics => _magics;
+    public IReadOnlyList<string> ChatLines => _chatLines;
+    public int BagCount => _bag.Count;
+    public int EquippedFilled => EquippedCount();
+
+    public string DisplayName(UserItem item) => ItemName(item);
 
     public void Connect(string host, int port, int timeoutMs = 5000)
     {
@@ -312,8 +324,8 @@ internal sealed class CrystalSession : IDisposable
                 _itemInfos[nii.Info.Index] = nii.Info;
                 break;
             case S.GainedItem gained when gained.Item != null:
-                _bag[gained.Item.UniqueID] = gained.Item;
-                Note($"GainedItem uid={gained.Item.UniqueID} index={gained.Item.ItemIndex} name={ItemName(gained.Item)} count={gained.Item.Count} bag={_bag.Count}");
+                PlaceInBag(gained.Item);
+                Note($"GainedItem uid={gained.Item.UniqueID} index={gained.Item.ItemIndex} name={ItemName(gained.Item)} count={gained.Item.Count} bag={_bag.Count} slot={SlotOf(gained.Item.UniqueID)}");
                 break;
             case S.GainedGold gg:
                 _goldGained += gg.Gold;
@@ -328,6 +340,7 @@ internal sealed class CrystalSession : IDisposable
                     if (_bag.TryGetValue(eq.UniqueID, out var worn))
                     {
                         _bag.Remove(eq.UniqueID);
+                        ClearInventorySlot(eq.UniqueID);
                         if (eq.To >= 0)
                         {
                             if (_equipment.Length <= eq.To)
@@ -394,7 +407,25 @@ internal sealed class CrystalSession : IDisposable
                 break;
             case S.Chat chat:
                 LastChat = chat.Message;
+                _chatLines.Add(chat.Message);
+                if (_chatLines.Count > 4)
+                    _chatLines.RemoveAt(0);
                 Note($"Chat [{chat.Type}] {chat.Message}");
+                break;
+            case S.NewMagic nm when nm.Magic != null && !nm.Hero:
+                _magics.Add(nm.Magic);
+                Note($"NewMagic {nm.Magic.Name} spell={nm.Magic.Spell} key={nm.Magic.Key} magics={_magics.Count}");
+                break;
+            case S.MagicLeveled ml:
+                foreach (var mag in _magics)
+                {
+                    if (mag.Spell == ml.Spell)
+                    {
+                        mag.Level = ml.Level;
+                        mag.Experience = ml.Experience;
+                    }
+                }
+                Note($"MagicLeveled {ml.Spell} lv={ml.Level}");
                 break;
             case S.Disconnect d:
                 Note($"Disconnect Reason={d.Reason}");
@@ -785,6 +816,9 @@ internal sealed class CrystalSession : IDisposable
             }
         }
         _equipment = user.Equipment ?? Array.Empty<UserItem?>();
+        _inventory = user.Inventory is { Length: > 0 } inv
+            ? (UserItem?[])inv.Clone()
+            : new UserItem?[46];
         if (user.Equipment != null)
         {
             for (int i = 0; i < user.Equipment.Length; i++)
@@ -794,6 +828,54 @@ internal sealed class CrystalSession : IDisposable
                 Note($"  equip[{(EquipmentSlot)i}] uid={it.UniqueID} name={ItemName(it)}");
             }
         }
+        _magics.Clear();
+        if (user.Magics != null)
+        {
+            _magics.AddRange(user.Magics);
+            foreach (var mag in _magics)
+                Note($"  magic {mag.Name} spell={mag.Spell} lv={mag.Level} key={mag.Key}");
+        }
+    }
+
+    void PlaceInBag(UserItem item)
+    {
+        _bag[item.UniqueID] = item;
+        if (_inventory.Length == 0)
+            _inventory = new UserItem?[46];
+        int slot = -1;
+        for (int i = 0; i < _inventory.Length; i++)
+        {
+            if (_inventory[i] == null)
+            {
+                slot = i;
+                break;
+            }
+        }
+        if (slot < 0)
+        {
+            slot = _inventory.Length;
+            Array.Resize(ref _inventory, slot + 1);
+        }
+        _inventory[slot] = item;
+    }
+
+    void ClearInventorySlot(ulong uniqueId)
+    {
+        for (int i = 0; i < _inventory.Length; i++)
+        {
+            if (_inventory[i]?.UniqueID == uniqueId)
+                _inventory[i] = null;
+        }
+    }
+
+    int SlotOf(ulong uniqueId)
+    {
+        for (int i = 0; i < _inventory.Length; i++)
+        {
+            if (_inventory[i]?.UniqueID == uniqueId)
+                return i;
+        }
+        return -1;
     }
 
     int EquippedCount() => _equipment.Count(e => e != null);
