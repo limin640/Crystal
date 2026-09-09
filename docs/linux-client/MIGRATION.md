@@ -111,6 +111,37 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 
 `--listen-without-world` is ignored when `Server.MirDB` and `*.map` files exist so StartGame is not handshake-only.
 
+### Evidence (this agent, external Jev at `/tmp/Crystal.Database/Jev` — not in git)
+
+Server (`--root …/Jev --no-version-check --allow-start-game`, **no** `--listen-without-world`):
+
+```
+WorldMode=full Server.MirDB=present Maps=1698
+CheckVersion=False EnforceDBChecks=False ListenWithoutWorld=False AllowStartGame=True
+463 Maps Loaded.
+Network Started.
+Server listening on 127.0.0.1:7000 (Running=True)
+User logged in.
+LinuxWar has connected.
+```
+
+Client (`--connect --headless --catalog fixtures/bake-out/catalog.json --maps …/Jev/Maps`):
+
+```
+LoginSuccess characters=0
+NewCharacterSuccess index=1 name=LinuxWar class=Warrior
+StartGame Result=4 (success)
+in-map: MapInformation index=1 file=0 title=BichonProvince
+in-map: UserInformation id=57940 name=LinuxWar loc=288,616
+send Walk → UserLocation 289,616 dir=Right  WalkAck=True
+Map loaded …/Maps/0.map 700x700
+headless Null: draws=167 floor=143 objectDraws=24
+```
+
+Linux Release builds green: `Crystal.Assets`, `Crystal.Graphics`, `Crystal.Bake`, `Server.Library`, `Server.Linux`, `Client.Linux`.
+
+That is NewCharacter → StartGame → in-map (+ one walk ack). It is **not** fight/loot/equip and **not** the hard gate.
+
 ## Still blocking fight / loot / equip (and a real walk loop)
 
 1. **Input** — one scripted `C.Walk` is evidence, not a Silk.NET keymap or GameScene movement loop.
