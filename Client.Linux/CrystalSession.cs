@@ -423,7 +423,7 @@ internal sealed class CrystalSession : IDisposable
         if (SellOk || UserGold > goldBefore || _bag.Count < bagBefore)
         {
             SellOk = true;
-            SellEvidence ??= $"SellItem {ItemName(item)} gold {goldBefore}→{UserGold} bag {bagBefore}→{_bag.Count}";
+            SellEvidence = $"SellItem {ItemName(item)} gold {goldBefore}→{UserGold} bag {bagBefore}→{_bag.Count}";
             Note("sell evidence: " + SellEvidence);
         }
         else

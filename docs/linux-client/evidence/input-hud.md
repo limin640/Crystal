@@ -132,6 +132,25 @@ FightHit=True LootOk=True EquipOk=True
   input   : talks=0
 ```
 
+## NPC buy / sell — C.BuyItem / C.SellItem (same VM, later)
+
+`--no-gate --input-script Talk,Buy:0,Sell`. Uses `S.NPCGoods` UniqueIDs. **EXIT:0**
+
+```
+NPCGoods count=43 type=Buy
+input Buy goods[0] BaseDress(M) gold=49940 bag=2
+LoseGold -120 → GainedItem BaseDress(M) bag=3
+buy evidence: BuyItem BaseDress(M) gold 49940→49820 bag 2→3
+input Sell BaseDress(M) gold=49820 bag=3
+GainedGold +60
+sell evidence: SellItem BaseDress(M) gold 49820→49880 bag 3→2
+hud npc: gold=49880 bag=2 buys=1 sells=1 BuyOk=True SellOk=True
+  hud-buy BuyItem BaseDress(M) gold 49940→49820 bag 2→3
+  hud-sell SellItem BaseDress(M) gold 49820→49880 bag 3→2
+```
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `buys=0` `sells=0`.
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, `C.BuyItem`/`C.SellItem`, player trade (`TradeRequest`/`TradeItem`/`TradeGold`/`TradeConfirm`), inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed.
+86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, player trade (`C.TradeRequest` empty / `C.TradeReply` / `C.TradeGold` / `C.TradeConfirm` / `C.TradeCancel` / `C.DepositTradeItem` / `C.RetrieveTradeItem`; server `S.TradeRequest` / `S.TradeGold` / `S.TradeItem` / `S.TradeConfirm` / `S.TradeCancel` / `S.DepositTradeItem` / `S.RetrieveTradeItem`), inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed. Trade needs a second online character.

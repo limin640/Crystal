@@ -280,7 +280,39 @@ hud npc: talkOk=True lines=3 goods=43 quests=12
 
 **Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `talks=0`.
 
-**NPC buy/sell** (`Talk,Buy:0,Sell`) evidence is recorded after the CloudAgent run below. Player trade stays deferred (packet names in the stub table). Inventory drag-drop, audio, WebView2 stay deferred. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
+### NPC buy / sell (2026-09-09, same VM)
+
+Same packets as Crystal `NPCDialogs`: `C.BuyItem` `{ ItemIndex = goods.UniqueID, Count = 1, Type = Buy }` and `C.SellItem` `{ UniqueID, Count = 1 }` after `S.NPCGoods`. Low gold uses existing test-server `@GIVEGOLD` (not PlayGate).
+
+**Input-script** `--no-gate --input-script Talk,Buy:0,Sell`: **EXIT:0**
+
+```
+CallNPC Merchant_Whitney [@Main] / [@BUYSELL] → NPCGoods count=43 type=Buy
+@GIVEGOLD 50000 → GainedGold +50000 gold=50000   (first run, gold was 0)
+input Buy goods[0] uid=52 name=BaseDress(M) gold=49940 bag=2
+LoseGold -120 gold=49820
+GainedItem name=BaseDress(M) bag=3
+buy evidence: BuyItem BaseDress(M) gold 49940→49820 bag 2→3
+input Sell uid=8 name=BaseDress(M) gold=49820 bag=3
+GainedGold +60 gold=49880
+sell evidence: SellItem BaseDress(M) gold 49820→49880 bag 3→2
+input-script done buys=1 sells=1 BuyOk=True SellOk=True gold=49880 bag=2
+hud npc: gold=49880 bag=2 buys=1 sells=1 BuyOk=True SellOk=True
+  hud-buy BuyItem BaseDress(M) gold 49940→49820 bag 2→3
+  hud-sell SellItem BaseDress(M) gold 49820→49880 bag 3→2
+```
+
+**Hard-gate** (no `--input-script`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=58297 by self
+  loot  : PickUp ground (HP)DrugSmall at 306,613 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword
+  input   : talks=0 buys=0 sells=0 BuyOk=False SellOk=False
+```
+
+Player trade stays deferred (packet names in the stub table — needs a second online character). Inventory drag-drop, audio, WebView2 stay deferred. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
 
 ### Mini-map + chat send (2026-09-09, same VM)
 
