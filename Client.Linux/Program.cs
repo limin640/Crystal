@@ -154,8 +154,12 @@ internal static class Program
         }
         if (session != null)
         {
-            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} NpcTalkOk={session.NpcTalkOk}");
-            Console.WriteLine($"  items   : bag={session.BagCount} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk}");
+            Console.WriteLine($"  items   : bag={session.BagCount} gold={session.UserGold} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
+            if (session.BuyEvidence != null)
+                Console.WriteLine($"  buy     : {session.BuyEvidence}");
+            if (session.SellEvidence != null)
+                Console.WriteLine($"  sell    : {session.SellEvidence}");
         }
         Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
         mapView?.Dispose();

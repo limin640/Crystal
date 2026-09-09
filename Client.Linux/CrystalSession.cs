@@ -105,6 +105,17 @@ internal sealed class CrystalSession : IDisposable
     public List<string> QuestNames { get; } = new();
     public int NpcCallSent { get; private set; }
     uint _defaultNpcId;
+    readonly List<UserItem> _goodsItems = new();
+    PanelType _goodsType = PanelType.Buy;
+    ulong _lastBoughtUid;
+    public bool BuyOk { get; private set; }
+    public bool SellOk { get; private set; }
+    public string? BuyEvidence { get; private set; }
+    public string? SellEvidence { get; private set; }
+    public int InputBuys { get; private set; }
+    public int InputSells { get; private set; }
+    public uint GoldSpent { get; private set; }
+    public uint GoldEarned { get; private set; }
     public const int BeltSlotCount = 6;
     public IReadOnlyList<UserItem?> InventorySlots => _inventory;
     public IReadOnlyList<UserItem?> EquipmentSlots => _equipment;
@@ -158,6 +169,12 @@ internal sealed class CrystalSession : IDisposable
             case GameCommandKind.Talk:
                 TryTalk();
                 break;
+            case GameCommandKind.Buy:
+                TryBuy(command.Slot);
+                break;
+            case GameCommandKind.Sell:
+                TrySell(command.Slot);
+                break;
         }
     }
 
@@ -179,15 +196,21 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} pickups={InputPickups} chats={InputChats} talks={InputTalks} NpcTalkOk={NpcTalkOk} npc={NpcName} loc={UserLocation.X},{UserLocation.Y} WalkAck={WalkAck} FightHit={FightHit}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} BuyOk={BuyOk} SellOk={SellOk} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} npc={NpcName} loc={UserLocation.X},{UserLocation.Y}");
+        if (BuyEvidence != null) Console.WriteLine($"  buy : {BuyEvidence}");
+        if (SellEvidence != null) Console.WriteLine($"  sell : {SellEvidence}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
         bool wantTalk = commands.Any(c => c.Kind == GameCommandKind.Talk);
+        bool wantBuy = commands.Any(c => c.Kind == GameCommandKind.Buy);
+        bool wantSell = commands.Any(c => c.Kind == GameCommandKind.Sell);
         if (wantWalk && InputWalks == 0) return 10;
         if (wantAtk && InputAttacks == 0) return 10;
         if (wantChat && ChatSent == 0) return 10;
         if (wantTalk && !NpcTalkOk) return 10;
+        if (wantBuy && !BuyOk) return 10;
+        if (wantSell && !SellOk) return 10;
         return 0;
     }
 
@@ -327,6 +350,85 @@ internal sealed class CrystalSession : IDisposable
 
     static int Chebyshev(Point a, Point b)
         => Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
+
+    void TryBuy(int goodsIndex)
+    {
+        InputBuys++;
+        if (_goodsItems.Count == 0)
+        {
+            Note("buy: no NPCGoods yet; Talk first");
+            TryTalk();
+        }
+        if (_goodsItems.Count == 0)
+        {
+            Note("buy: still no NPCGoods");
+            return;
+        }
+
+        if (UserGold < 500)
+        {
+            Note("buy: low gold; @GIVEGOLD 50000 (test-server)");
+            Chat("@GIVEGOLD 50000");
+            Pump(600);
+        }
+
+        int idx = Math.Clamp(goodsIndex, 0, _goodsItems.Count - 1);
+        var goods = _goodsItems[idx];
+        int bagBefore = _bag.Count;
+        uint goldBefore = UserGold;
+        Send(new C.BuyItem { ItemIndex = goods.UniqueID, Count = 1, Type = _goodsType == PanelType.BuySub ? PanelType.BuySub : PanelType.Buy });
+        Note($"input Buy goods[{idx}] uid={goods.UniqueID} name={ItemName(goods)} gold={UserGold} bag={bagBefore} #{InputBuys}");
+        Pump(1000);
+
+        if (_bag.Count > bagBefore || GoldSpent > 0 || UserGold < goldBefore)
+        {
+            BuyOk = true;
+            var bought = _bag.Values.LastOrDefault();
+            if (bought != null)
+                _lastBoughtUid = bought.UniqueID;
+            BuyEvidence = $"BuyItem {ItemName(goods)} gold {goldBefore}→{UserGold} bag {bagBefore}→{_bag.Count}";
+            Note("buy evidence: " + BuyEvidence);
+        }
+        else
+            Note($"buy: no bag/gold change after C.BuyItem (gold={UserGold} bag={_bag.Count})");
+    }
+
+    void TrySell(int bagIndex)
+    {
+        InputSells++;
+        if (_goodsItems.Count == 0 && NpcObjectId != 0)
+        {
+            Note("sell: open [@BUYSELL] before C.SellItem");
+            TryTalk();
+        }
+
+        UserItem? item = null;
+        if (_lastBoughtUid != 0 && _bag.TryGetValue(_lastBoughtUid, out var bought))
+            item = bought;
+        else if (bagIndex >= 0 && bagIndex < _inventory.Length)
+            item = _inventory[bagIndex];
+        item ??= _bag.Values.FirstOrDefault(i => ItemTypeOf(i) is ItemType.Potion or ItemType.Nothing or ItemType.Meat or ItemType.Ore);
+        item ??= _bag.Values.LastOrDefault();
+        if (item == null)
+        {
+            Note("sell: empty bag");
+            return;
+        }
+
+        uint goldBefore = UserGold;
+        int bagBefore = _bag.Count;
+        Send(new C.SellItem { UniqueID = item.UniqueID, Count = 1 });
+        Note($"input Sell uid={item.UniqueID} name={ItemName(item)} gold={UserGold} bag={bagBefore} #{InputSells}");
+        Pump(1000);
+        if (SellOk || UserGold > goldBefore || _bag.Count < bagBefore)
+        {
+            SellOk = true;
+            SellEvidence ??= $"SellItem {ItemName(item)} gold {goldBefore}→{UserGold} bag {bagBefore}→{_bag.Count}";
+            Note("sell evidence: " + SellEvidence);
+        }
+        else
+            Note($"sell: no gold/bag change after C.SellItem (gold={UserGold} bag={_bag.Count})");
+    }
 
     void TryBuyKeyFromDialog(uint npcId)
     {
@@ -522,7 +624,34 @@ internal sealed class CrystalSession : IDisposable
             case S.GainedGold gg:
                 _goldGained += gg.Gold;
                 UserGold += gg.Gold;
+                GoldEarned += gg.Gold;
                 Note($"GainedGold +{gg.Gold} totalSession={_goldGained} gold={UserGold}");
+                break;
+            case S.LoseGold lg:
+                GoldSpent += lg.Gold;
+                UserGold = UserGold > lg.Gold ? UserGold - lg.Gold : 0;
+                Note($"LoseGold -{lg.Gold} gold={UserGold}");
+                break;
+            case S.SellItem sold:
+                Note($"SellItem Success={sold.Success} uid={sold.UniqueID} count={sold.Count}");
+                if (sold.Success)
+                {
+                    SellOk = true;
+                    if (_bag.TryGetValue(sold.UniqueID, out var soldItem))
+                    {
+                        if (sold.Count >= soldItem.Count)
+                        {
+                            _bag.Remove(sold.UniqueID);
+                            ClearInventorySlot(sold.UniqueID);
+                        }
+                        else
+                            soldItem.Count = (ushort)(soldItem.Count - sold.Count);
+                        SellEvidence = $"SellItem Success name={ItemName(soldItem)} uid={sold.UniqueID} gold={UserGold} bag={_bag.Count}";
+                    }
+                    else
+                        SellEvidence = $"SellItem Success uid={sold.UniqueID} gold={UserGold} bag={_bag.Count}";
+                    Note(SellEvidence);
+                }
                 break;
             case S.EquipItem eq:
                 Note($"EquipItem Success={eq.Success} grid={eq.Grid} to={eq.To} uid={eq.UniqueID}");
@@ -619,11 +748,14 @@ internal sealed class CrystalSession : IDisposable
                 break;
             case S.NPCGoods goods:
                 NpcGoods.Clear();
+                _goodsItems.Clear();
+                _goodsType = goods.Type;
                 if (goods.List != null)
                 {
                     foreach (var it in goods.List)
                     {
                         if (it == null) continue;
+                        _goodsItems.Add(it);
                         NpcGoods.Add(ItemName(it));
                     }
                 }

@@ -194,9 +194,10 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Chat log + send | **In progress** — last 4 lines; `--input-script Chat:hello` / windowed Enter compose → `C.Chat` |
 | Mini-map chrome | **In progress** — IRenderer geometry + player blip from map size / `MapCell` occupancy (`MMap.Lib` not loaded) |
 | NPC talk (`C.CallNPC` `[@Main]` / `S.NPCResponse`) | **In progress** — IRenderer name + dialog lines |
-| NPC goods (`S.NPCGoods`) | **In progress** if the server sends it after `[@BUY]`/`[@BUYSELL]`; `C.BuyItem`/`C.SellItem` UI deferred |
+| NPC goods (`S.NPCGoods`) | **In progress** — list after `[@BUY]`/`[@BUYSELL]` |
+| NPC buy / sell (`C.BuyItem` / `C.SellItem`) | **In progress** — `--input-script Talk,Buy:0,Sell` uses existing `NPCGoods` UniqueIDs; gold/bag in logs + HUD |
 | Quest panel | **In progress** only as names from `S.NewQuestInfo` if they arrive; no accept/turn-in UI |
-| Player trade (`TradeRequest`/`TradeItem`/`TradeGold`) | Stub — deferred |
+| Player trade | Stub — deferred (needs a second online character). Packets: `C.TradeRequest` (empty; faces/selected player), `C.TradeReply` (`AcceptInvite`), `C.TradeGold` (`Amount`), `C.TradeConfirm` (`Locked`), `C.TradeCancel`, `C.DepositTradeItem`/`C.RetrieveTradeItem` (`From`,`To`); server `S.TradeRequest`, `S.TradeGold`, `S.TradeItem` (`TradeItems[]`), `S.TradeConfirm`, `S.TradeCancel`, `S.DepositTradeItem`, `S.RetrieveTradeItem` |
 | Inventory drag-drop | Stub — deferred |
 | Magic targeting / skill icons (`MagIcon`) | Stub |
 | Inventory drag-drop / use-item clicks | Stub (`C.EquipItem` still works) |
@@ -209,7 +210,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 ```bash
 # headless multi-step input after StartGame (does not replace the hard-gate --connect path)
 dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
-  --connect --headless --input-script Right,Talk,Attack \
+  --connect --headless --input-script Talk,Buy:0,Sell \
   --catalog Tools/Crystal.Bake/fixtures/bake-out/catalog.json \
   --maps /path/to/Crystal.Database/Jev/Maps
 
@@ -279,7 +280,7 @@ hud npc: talkOk=True lines=3 goods=43 quests=12
 
 **Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `talks=0`.
 
-Deferred: `C.BuyItem` / `C.SellItem`, player `TradeRequest`/`TradeItem`/`TradeGold`/`TradeConfirm`, inventory drag-drop, audio, WebView2. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
+**NPC buy/sell** (`Talk,Buy:0,Sell`) evidence is recorded after the CloudAgent run below. Player trade stays deferred (packet names in the stub table). Inventory drag-drop, audio, WebView2 stay deferred. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
 
 ### Mini-map + chat send (2026-09-09, same VM)
 
@@ -329,7 +330,7 @@ Skill stubs drew (`skill=30`) with `skills=0` — Warrior has no `ClientMagic` y
 ## Remaining gaps (OK to defer)
 
 1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
-2. **Audio / WebView2 / player-trade / drag-drop** — documented stubs; not a Linux verb blocker. NPC talk is in progress (`CallNPC`/`NPCResponse`). `C.BuyItem`/`C.SellItem` and quest accept stay stubbed.
+2. **Audio / WebView2 / player-trade / drag-drop** — documented stubs; not a Linux verb blocker. NPC talk + `C.BuyItem`/`C.SellItem` are in progress (`CallNPC`/`NPCResponse`/`NPCGoods`). Quest accept stays stubbed. Player trade needs a second online character (packet names in the WinForms stub table).
 3. **Operator art** — floor/objects still catalog or `--data` `.Lib`; 86 catalog slots remain missing-on-disk. No invented WIL.
 4. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 

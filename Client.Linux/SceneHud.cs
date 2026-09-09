@@ -83,17 +83,17 @@ internal sealed class SceneHud : IDisposable
             Fill(16, height - 32, (int)(barW * (mp / (float)mpMax)), 12, Color.FromArgb(255, 48, 96, 200));
         Text(16 + barW + 8, height - 34, $"MP {mp}/{mpMax}", Color.LightSteelBlue);
 
-        Text(width - 220, height - 28, $"in {session.InputWalks} atk {session.InputAttacks} say {session.InputChats}", Color.Silver);
+        Text(width - 280, height - 28, $"in {session.InputWalks} atk {session.InputAttacks} buy {session.InputBuys} sell {session.InputSells} G{session.UserGold}", Color.Silver);
         if (session.ChatComposing)
             Text(16, height - 72, $"> {session.ChatDraft}_", Color.Yellow);
     }
 
     public void WriteEvidence(CrystalSession session)
     {
-        Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
+        Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} gold={session.UserGold} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
         Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex} (geometry only)");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
-        Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count}");
+        Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count} gold={session.UserGold} bag={session.BagCount} buys={session.InputBuys} sells={session.InputSells} BuyOk={session.BuyOk} SellOk={session.SellOk}");
         Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} minimap={MiniMapDraws} npc={NpcDraws} total={HudDraws}");
         for (int i = 0; i < session.InventorySlots.Count; i++)
         {
@@ -118,6 +118,10 @@ internal sealed class SceneHud : IDisposable
             Console.WriteLine($"  hud-npc-say {line}");
         foreach (string g in session.NpcGoods.Take(8))
             Console.WriteLine($"  hud-npc-goods {g}");
+        if (session.BuyEvidence != null)
+            Console.WriteLine($"  hud-buy {session.BuyEvidence}");
+        if (session.SellEvidence != null)
+            Console.WriteLine($"  hud-sell {session.SellEvidence}");
         foreach (string q in session.QuestNames.Take(8))
             Console.WriteLine($"  hud-quest {q}");
     }
@@ -143,6 +147,8 @@ internal sealed class SceneHud : IDisposable
             Text(x + 6, row, Clip(line, 30), Color.Thistle);
             row += 14;
         }
+        Text(x + 6, row, $"GOLD {session.UserGold} BAG {session.BagCount}", Color.Khaki);
+        row += 14;
         if (session.NpcGoods.Count > 0)
         {
             Text(x + 6, row, "GOODS", Color.Khaki);

@@ -50,6 +50,28 @@ internal static class InputMap
             return true;
         }
 
+        if (t.Equals("Buy", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Buy:", StringComparison.OrdinalIgnoreCase))
+        {
+            int idx = 0;
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+                int.TryParse(t[(colon + 1)..].Trim(), out idx);
+            command = GameCommand.Buy(Math.Max(0, idx));
+            return true;
+        }
+
+        if (t.Equals("Sell", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Sell:", StringComparison.OrdinalIgnoreCase))
+        {
+            int idx = -1;
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+                int.TryParse(t[(colon + 1)..].Trim(), out idx);
+            command = GameCommand.Sell(idx);
+            return true;
+        }
+
         if (t.Equals("Talk", StringComparison.OrdinalIgnoreCase)
             || t.Equals("NPC", StringComparison.OrdinalIgnoreCase)
             || t.Equals("Npc", StringComparison.OrdinalIgnoreCase))
