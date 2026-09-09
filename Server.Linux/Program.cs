@@ -23,21 +23,21 @@ internal static class Program
 
         Packet.IsServer = true;
 
+        bool probeOnly = args.Contains("--bind-probe");
         string? root = GetOption(args, "--root") ?? Environment.GetEnvironmentVariable("CRYSTAL_SERVER_ROOT");
-        if (!string.IsNullOrWhiteSpace(root))
+        if (string.IsNullOrWhiteSpace(root))
         {
-            root = Path.GetFullPath(root);
-            Directory.CreateDirectory(root);
-            Directory.SetCurrentDirectory(root);
-            Console.WriteLine($"Working directory (Crystal.Database / Jev layout): {root}");
-        }
-        else
-        {
-            Console.WriteLine($"Working directory: {Directory.GetCurrentDirectory()}");
-            Console.WriteLine("Point --root at an external Crystal.Database Jev tree (Configs/Envir/Maps/Server.MirDB).");
+            // Never drop Configs/Envir into the git worktree.
+            root = Path.Combine(Path.GetTempPath(), "crystal-server-root");
+            Console.WriteLine("No --root given; using a throwaway directory (not a Crystal.Database pack).");
         }
 
-        var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
+        root = Path.GetFullPath(root);
+        Directory.CreateDirectory(root);
+        Directory.SetCurrentDirectory(root);
+        Console.WriteLine($"Working directory (Crystal.Database / Jev layout): {root}");
+
+        var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly()!);
         FileInfo logConfig = new(Path.Combine(AppContext.BaseDirectory, "log4net.config"));
         if (logConfig.Exists)
             XmlConfigurator.Configure(logRepository, logConfig);
@@ -70,7 +70,6 @@ internal static class Program
             Settings.Port = (ushort)port;
 
         int seconds = GetInt(args, "--seconds") ?? 0;
-        bool probeOnly = args.Contains("--bind-probe");
 
         Console.WriteLine($"CheckVersion={Settings.CheckVersion} EnforceDBChecks={Settings.EnforceDBChecks} ListenWithoutWorld={Settings.ListenWithoutWorld}");
         Console.WriteLine($"Bind {Settings.IPAddress}:{Settings.Port}");
@@ -150,22 +149,30 @@ internal static class Program
 
     static bool WaitForPort(string ip, int port, DateTime deadline, CancellationToken token)
     {
-        string host = ip is "0.0.0.0" or "::" ? "127.0.0.1" : ip;
+        _ = ip;
         while (DateTime.UtcNow < deadline && !token.IsCancellationRequested)
         {
             DrainMessages();
-            try
+            // Do not TCP-connect the game port here: accept would IP-block 127.0.0.1 for 5s.
+            if (IsListening(port))
+                return true;
+            Thread.Sleep(200);
+        }
+        return IsListening(port);
+    }
+
+    static bool IsListening(int port)
+    {
+        string hex = port.ToString("X4");
+        foreach (string path in new[] { "/proc/net/tcp", "/proc/net/tcp6" })
+        {
+            if (!File.Exists(path))
+                continue;
+            foreach (string line in File.ReadLines(path))
             {
-                using var client = new TcpClient();
-                var ar = client.BeginConnect(host, port, null, null);
-                if (ar.AsyncWaitHandle.WaitOne(400) && client.Connected)
+                if (line.Contains($":{hex}", StringComparison.OrdinalIgnoreCase) && line.Contains(" 0A "))
                     return true;
             }
-            catch
-            {
-                // not up yet
-            }
-            Thread.Sleep(200);
         }
         return false;
     }
