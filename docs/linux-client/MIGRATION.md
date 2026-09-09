@@ -179,7 +179,7 @@ Linux Release builds still green. Jev / Data stay outside git.
 
 Silk.NET windowed keyboard/mouse (WASD / arrows / numpad, Space/Ctrl attack, G pickup, left-click walk, right-click attack) drives **the same** `C.Walk` / `C.Attack` / `C.PickUp` packets as Crystal. Headless CI injects the same commands with `--input-script Right,Right,Attack`.
 
-Minimum **select** and **game HUD** (map title, loc, HP/MP bars, last chat) draw through `IRenderer` — not WinForms. Procedural 3×5 HUD glyphs are UI chrome, not WIL art.
+Minimum **select** and **game HUD** (map title, loc, level/class/gold, HP/MP bars, last chat) draw through `IRenderer` — not WinForms. Procedural 3×5 HUD glyphs are UI chrome, not WIL art.
 
 Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not invent art.
 
@@ -208,6 +208,47 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
   --connect --window --catalog … --maps …
 ```
+
+### CloudAgent evidence (2026-09-09)
+
+Linux Release builds green: `Crystal.Assets`, `Crystal.Graphics`, `Crystal.Bake`, `Server.Library`, `Server.Linux`, `Client.Linux`.
+
+**Hard-gate unchanged** (`--connect --headless`, no `--input-script`): **EXIT:0**
+
+```
+StartGame Result=4 (success)
+WalkAck=True loc=300,615
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58653 by self
+  loot  : PickUp ground (HP)DrugSmall at 300,615 bag=2
+  equip : EquipItem Success slot=Torch name=Candle uid=4
+  input   : walks=0 attacks=0 pickups=0
+```
+
+**Input-injected walk+attack after StartGame** (`--no-gate --input-script Right,Right,Attack,Down,Attack`): **EXIT:0**
+
+```
+StartGame Result=4 → InMap BichonProvince loc=298,615
+input-script 5 commands
+input Walk Right #1 loc=298,615 → UserLocation 299,615
+input Walk Right #2 loc=299,615 → UserLocation 300,615
+input Attack Right #1
+input Walk Down #3 loc=300,615 → UserLocation 300,616
+input Attack Down #2
+input-script done walks=3 attacks=2 pickups=0 loc=300,616 WalkAck=True
+  input   : walks=3 attacks=2 pickups=0
+```
+
+**Windowed OpenGL** (`--connect --window --frames 12 --no-gate --input-script Right,Attack`): **EXIT:0**
+
+```
+input Walk Right #1 → UserLocation 301,615
+input Attack Right #1 → ObjectStruck / DamageIndicator / ObjectHealth
+input-script done walks=1 attacks=1 WalkAck=True FightHit=True
+Client.Linux windowed OK frames=12 backend=Silk.NET OpenGL
+```
+
+See [evidence/input-hud.md](evidence/input-hud.md). Catalog **86** slots remain pack-missing.
 
 ## Remaining gaps (OK to defer)
 
