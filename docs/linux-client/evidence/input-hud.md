@@ -49,6 +49,37 @@ input-script done walks=1 attacks=1 FightHit=True
 Client.Linux windowed OK frames=12 backend=Silk.NET OpenGL
 ```
 
+## Inventory / equip / belt / skill HUD (same VM, later)
+
+IRenderer panels from `UserInformation` / `GainedItem` / `EquipItem`. No WIL item icons.
+
+**Input-script** `--no-gate --input-script Right,Right,Attack,Down,Attack`: **EXIT:0**
+
+```
+input-script done walks=3 attacks=2 loc=304,616 WalkAck=True
+hud inventory/equip: bag=1/46 equip=3/14 belt=1/6 skills=0 chat=3
+hud draws: inv=50 equip=136 belt=21 skill=30 chat=86 total=412
+  hud-bag slot=0 belt name=(HP)DrugSmall x1
+  hud-equip slot=Weapon name=WoodenSword
+  hud-equip slot=Armour name=BaseDress(M)
+  hud-equip slot=Torch name=Candle
+  hud-chat Welcome to the Legend of Mir 2 Server.
+```
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+hud inventory/equip: bag=2/46 equip=3/14 belt=2/6 skills=0 chat=4
+hud draws: inv=50 equip=136 belt=25 skill=30 chat=130 total=462
+  hud-bag slot=0 belt (HP)DrugSmall
+  hud-bag slot=1 belt (HP)DrugSmall
+  hud-equip Weapon / Armour / Torch
+  input   : walks=0 attacks=0 pickups=0
+```
+
+Skill bar draws 8 empty stubs when `Magics` is empty (Warrior, no invented spells).
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio) and WebView2 stay deferred and do not block.
+86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio) and WebView2 stay deferred and do not block. Full WinForms NPC/quest/trade, drag-drop, mini-map, chat input, and magic targeting stay stubbed.

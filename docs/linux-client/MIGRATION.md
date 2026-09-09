@@ -254,6 +254,33 @@ Client.Linux windowed OK frames=12 backend=Silk.NET OpenGL
 
 See [evidence/input-hud.md](evidence/input-hud.md). Catalog **86** slots remain pack-missing.
 
+### Inventory / equip HUD (2026-09-09, same VM)
+
+**Input-script** `--no-gate --input-script Right,Right,Attack,Down,Attack`: **EXIT:0**
+
+```
+input-script done walks=3 attacks=2 loc=304,616 WalkAck=True
+hud inventory/equip: bag=1/46 equip=3/14 belt=1/6 skills=0 chat=3
+hud draws: inv=50 equip=136 belt=21 skill=30 chat=86 total=412
+  hud-bag slot=0 belt name=(HP)DrugSmall x1
+  hud-equip slot=Weapon name=WoodenSword
+  hud-equip slot=Armour name=BaseDress(M)
+  hud-equip slot=Torch name=Candle
+```
+
+**Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, input counters 0.
+
+```
+hud inventory/equip: bag=2/46 equip=3/14 belt=2/6 skills=0 chat=4
+hud draws: inv=50 equip=136 belt=25 skill=30 chat=130 total=462
+  hud-bag slot=0 belt name=(HP)DrugSmall
+  hud-bag slot=1 belt name=(HP)DrugSmall
+  hud-equip Weapon WoodenSword / Armour BaseDress(M) / Torch Candle
+  input   : walks=0 attacks=0 pickups=0
+```
+
+Skill stubs drew (`skill=30`) with `skills=0` — Warrior has no `ClientMagic` yet; no invented icons. Catalog **86** still pack-missing.
+
 ## Remaining gaps (OK to defer)
 
 1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
