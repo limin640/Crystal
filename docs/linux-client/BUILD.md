@@ -76,7 +76,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 
 `--headless` initializes `NullRenderer`, uploads atlas PNGs, issues `DrawQuad` for each catalog sprite, and exits 0. That is compile + launch + catalog-draw evidence, **not** login→equip parity.
 
-`--frames N` closes a windowed session after N presents (useful on a box with a display). Without a `DISPLAY`/`WAYLAND_DISPLAY`, the windowed path exits 4 and tells you to use `--headless`.
+`--frames N` closes a windowed session after N presents (useful on a box with a display). Windowed OpenGL needs a working display **and** GLFW (`sudo apt-get install libglfw3 libgl1` on Debian/Ubuntu). Without a usable window platform the process exits 4 and tells you to use `--headless`. CI should stay on `--headless`.
 
 ## Windows Client (unchanged TFM)
 
