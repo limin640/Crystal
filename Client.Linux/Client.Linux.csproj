@@ -8,17 +8,24 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Client.Linux</RootNamespace>
     <AssemblyName>Crystal.Client.Linux</AssemblyName>
-    <Description>Linux-capable Crystal client host. OpenGL via Silk.NET; --headless for CI without a display.</Description>
+    <Description>Linux-capable Crystal client host. OpenGL via Silk.NET; Shared protocol connect; --headless for CI.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Crystal.Graphics\Crystal.Graphics.csproj" />
     <ProjectReference Include="..\Crystal.Assets\Crystal.Assets.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Silk.NET.Windowing" Version="2.22.0" />
     <PackageReference Include="Silk.NET.OpenGL" Version="2.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Mir2Test.ini">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

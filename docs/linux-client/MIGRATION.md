@@ -17,8 +17,9 @@ Data tree (WIL/WZL/WTL/Lib)
              └── OpenGLRenderer / NullRenderer (Client.Linux)
         │
         ▼
- Client.Linux: clear + batched atlas quads from catalog
- later: scenes + input + network on Linux host
+ Client.Linux: catalog DrawQuad + Shared protocol connect/login attempt
+ Server.Linux: Envir listen on 7000 (external Crystal.Database Jev root)
+ later: select → walk → fight → loot → equip
 ```
 
 ## Design choices
@@ -71,9 +72,26 @@ bake-out/
 
 WTL: v1 RLE + DXT-like 8-byte blocks and v2 zlib+DXT1/3/5 are decoded in software. Unknown texture types stay undecoded and are counted as listed-not-decoded.
 
-## Next increments (not this PR)
+## Phase C checklist (this increment)
 
-1. Drive `MLibrary` from a bake catalog on Linux when present (fallback to `.Lib`).
-2. Silk.NET input map + fold scenes into `Client.Linux`.
-3. Linux audio (NAudio is Windows) and drop WebView2 patcher browser.
-4. End-to-end login…equip vs Crystal server.
+| Unit | Status |
+| --- | --- |
+| `Server.Library` (`net8.0`) builds on Linux | Done |
+| `Server.Linux` console host (no WinForms) | Done |
+| Listen on 7000 (`--listen-without-world` or full Jev world) | Done (document `--root`) |
+| External Crystal.Database Jev path, not vendored | Done — see BUILD.md |
+| Client.Linux `Mir2Test.ini` IP/port + `--connect` | Done |
+| Shared `Packet` handshake: Connected → ClientVersion → NewAccount/Login | Done |
+| Bake / IRenderer / no SlimDX on Linux | Unchanged |
+| Login → select → walk → fight → loot → equip | **Not claimed** |
+
+## Still blocking walk / fight / loot / equip
+
+1. **World completeness** — StartGame needs Jev `Maps/` + `Server.MirDB` passing `CanStartEnvir` (start point + mob/item DB checks). `--listen-without-world` is handshake-only.
+2. **Client scenes on Linux** — `LoginScene` / `SelectScene` / `GameScene` still live in the WinForms Client. Client.Linux speaks packets but does not render those scenes or send walk/attack/loot/equip.
+3. **Input** — no Silk.NET input map yet.
+4. **Runtime `.Lib` / bake catalog on the scene path** — GameScene still loads `MLibrary` on Windows; Linux host has not folded that in.
+5. **Audio / WebView2** — Windows-only, later.
+6. **Version hash** — default `CheckVersion` wants `Mir2.Exe`. Linux server must use `--no-version-check` (or a real hash list).
+
+Hard gate remains: login→select→walk→fight→loot→equip on Linux vs Crystal server.

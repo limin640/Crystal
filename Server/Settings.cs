@@ -47,6 +47,11 @@ namespace Server
         public static int ThreadLimit = 2;
         public static bool TestServer = false;
         public static bool EnforceDBChecks = true;
+        /// <summary>
+        /// When the world cannot start (missing maps / DB checks), still bind the game port
+        /// so a Linux host can prove listen + handshake. Full play still needs a Crystal.Database tree.
+        /// </summary>
+        public static bool ListenWithoutWorld = false;
 
         public static bool MonsterProcessWhenAlone = false;
 
@@ -385,6 +390,7 @@ namespace Server
             ThreadLimit = Reader.ReadInt32("General", "ThreadLimit", ThreadLimit);
             TestServer = Reader.ReadBoolean("General", "TestServer", TestServer);
             EnforceDBChecks = Reader.ReadBoolean("General", "EnforceDBChecks", EnforceDBChecks);
+            ListenWithoutWorld = Reader.ReadBoolean("General", "ListenWithoutWorld", ListenWithoutWorld);
             MonsterProcessWhenAlone = Reader.ReadBoolean("General", "MonsterProcessWhenAlone", MonsterProcessWhenAlone);
             Language=Reader.ReadString("General", "Language", Language);
 
@@ -673,6 +679,7 @@ namespace Server
             Reader.Write("General", "ThreadLimit", ThreadLimit);
             Reader.Write("General", "TestServer", TestServer);
             Reader.Write("General", "EnforceDBChecks", EnforceDBChecks);
+            Reader.Write("General", "ListenWithoutWorld", ListenWithoutWorld);
             Reader.Write("General", "MonsterProcessWhenAlone", MonsterProcessWhenAlone);
             Reader.Write("General", "Language", Language);
 

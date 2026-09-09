@@ -2025,9 +2025,35 @@ namespace Server.MirEnvir
                 if (canstartserver != "true")
                 {
                     MessageQueue.Enqueue(canstartserver);
-                    StopEnvir();
+                    if (!Settings.ListenWithoutWorld)
+                    {
+                        StopEnvir();
+                        _thread = null;
+                        Stop();
+                        return;
+                    }
+
+                    MessageQueue.Enqueue("ListenWithoutWorld: binding the game port without a complete world (login handshake only).");
+                    StartNetwork();
+                    try
+                    {
+                        while (Running)
+                        {
+                            Time = Stopwatch.ElapsedMilliseconds;
+                            lock (Connections)
+                            {
+                                for (var i = Connections.Count - 1; i >= 0; i--)
+                                    Connections[i].Process();
+                            }
+                            Thread.Sleep(1);
+                        }
+                    }
+                    finally
+                    {
+                        StopNetwork();
+                        StopEnvir();
+                    }
                     _thread = null;
-                    Stop();
                     return;
                 }
 

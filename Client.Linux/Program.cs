@@ -19,15 +19,62 @@ internal static class Program
     static int Main(string[] args)
     {
         bool headless = args.Any(a => a is "--headless" or "-h");
+        bool connect = args.Contains("--connect");
         string? catalogPath = GetOption(args, "--catalog");
         int width = GetInt(args, "--width") ?? 1024;
         int height = GetInt(args, "--height") ?? 768;
         int? frames = GetInt(args, "--frames");
 
+        int connectCode = 0;
+        if (connect)
+            connectCode = RunConnect(args);
+
         if (headless)
-            return RunHeadless(catalogPath, width, height, frames ?? 1);
+        {
+            int drawCode = RunHeadless(catalogPath, width, height, frames ?? 1);
+            return connect ? (connectCode != 0 ? connectCode : drawCode) : drawCode;
+        }
+
+        if (connect && !args.Contains("--window"))
+            return connectCode;
 
         return RunWindow(catalogPath, width, height, frames);
+    }
+
+    static int RunConnect(string[] args)
+    {
+        string iniPath = GetOption(args, "--ini") ?? Path.Combine(AppContext.BaseDirectory, "Mir2Test.ini");
+        string host = GetOption(args, "--ip") ?? "127.0.0.1";
+        int port = GetInt(args, "--port") ?? 7000;
+        string account = GetOption(args, "--account") ?? "linux";
+        string password = GetOption(args, "--password") ?? "linux1";
+        bool create = args.Contains("--new-account");
+        int waitMs = GetInt(args, "--wait-ms") ?? 1500;
+
+        if (File.Exists(iniPath))
+        {
+            var ini = new InIReader(iniPath);
+            host = ini.ReadString("Network", "IPAddress", host);
+            port = ini.ReadInt32("Network", "Port", port);
+            account = ini.ReadString("Login", "AccountID", account);
+            password = ini.ReadString("Login", "Password", password);
+            if (!args.Contains("--new-account"))
+                create = ini.ReadBoolean("Login", "NewAccount", create);
+            Console.WriteLine($"Loaded {iniPath}");
+        }
+        else
+            Console.WriteLine($"No ini at {iniPath}; using CLI/defaults.");
+
+        if (GetOption(args, "--ip") is string ipOverride)
+            host = ipOverride;
+        if (GetInt(args, "--port") is int portOverride)
+            port = portOverride;
+        if (GetOption(args, "--account") is string accOverride)
+            account = accOverride;
+        if (GetOption(args, "--password") is string pwOverride)
+            password = pwOverride;
+
+        return CrystalSession.RunAttempt(host, port, account, password, create, waitMs);
     }
 
     static int RunHeadless(string? catalogPath, int width, int height, int frames)

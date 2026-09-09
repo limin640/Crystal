@@ -9,14 +9,18 @@ export PATH="$HOME/.dotnet:$PATH"
 
 ## Linux (this environment)
 
-These three projects are the Linux-capable path:
+These projects are the Linux-capable path:
 
 ```bash
 dotnet build Crystal.Assets/Crystal.Assets.csproj -c Release
 dotnet build Crystal.Graphics/Crystal.Graphics.csproj -c Release
 dotnet build Tools/Crystal.Bake/Crystal.Bake.csproj -c Release
+dotnet build Server/Server.Library.csproj -c Release
+dotnet build Server.Linux/Server.Linux.csproj -c Release
 dotnet build Client.Linux/Client.Linux.csproj -c Release
 ```
+
+`Server.MirForms` (`net8.0-windows7.0` WinExe) does **not** build on Linux. Use `Server.Linux`.
 
 ### Bake + coverage against the sample Data tree
 
@@ -78,6 +82,34 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 
 `--frames N` closes a windowed session after N presents (useful on a box with a display). Windowed OpenGL needs a working display **and** GLFW (`sudo apt-get install libglfw3 libgl1` on Debian/Ubuntu). Without a usable window platform the process exits 4 and tells you to use `--headless`. CI should stay on `--headless`.
 
+### Linux server + protocol attempt
+
+Do **not** vendor Crystal.Database into git. Clone or copy the Jev tree to a box path:
+
+```bash
+git clone --depth 1 https://github.com/Suprcode/Crystal.Database.git /path/to/Crystal.Database
+# layout: /path/to/Crystal.Database/Jev/{Configs,Envir,Maps,Server.MirDB}
+```
+
+```bash
+# listen on 7000 even if maps/DB checks are incomplete (handshake + login)
+dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
+  --root /path/to/Crystal.Database/Jev \
+  --no-version-check --listen-without-world --seconds 30
+
+# or, bind-only (no Envir) to prove the port:
+dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
+  --bind-probe --port 7000 --seconds 3
+
+# attempt Connected → ClientVersion → NewAccount → Login
+dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
+  --connect --ini Client.Linux/Mir2Test.ini --headless
+```
+
+`Client.Linux/Mir2Test.ini` is the Mir2Test.ini-style IP/port/account file. `--no-version-check` is required because Linux has no `Mir2.Exe` hash.
+
+A complete Jev `Maps/` + `Server.MirDB` is required for StartGame / walk. Login handshake does not need baked WIL art.
+
 ## Windows Client (unchanged TFM)
 
 ```bat
@@ -91,5 +123,6 @@ Needs Windows + SlimDX (`Components\SlimDX.dll`). Will **not** compile on Linux 
 ```bash
 # Linux: build only the portable projects (the .sln also contains WinExe projects)
 dotnet build Crystal.Assets/Crystal.Assets.csproj Crystal.Graphics/Crystal.Graphics.csproj \
-  Tools/Crystal.Bake/Crystal.Bake.csproj Client.Linux/Client.Linux.csproj
+  Tools/Crystal.Bake/Crystal.Bake.csproj Server/Server.Library.csproj \
+  Server.Linux/Server.Linux.csproj Client.Linux/Client.Linux.csproj
 ```
