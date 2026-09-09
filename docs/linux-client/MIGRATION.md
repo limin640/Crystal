@@ -255,6 +255,24 @@ Client.Linux windowed OK frames=12 backend=Silk.NET OpenGL
 
 See [evidence/input-hud.md](evidence/input-hud.md). Catalog **86** slots remain pack-missing.
 
+### Mini-map + chat send (2026-09-09, same VM)
+
+**Input-script** `--no-gate --input-script Right,Chat:hello,Attack,Down,Attack`: **EXIT:0**
+
+```
+input Chat send 'hello' #1
+input-script done walks=2 attacks=2 chats=1 ChatSent=1 ChatRecv=3 loc=306,616 WalkAck=True
+map size 700x700 (MapReader / known cells — no invented MMap art)
+hud minimap: 700x700 blip=306,616 blips=16 draws=817 mmapLib=101 (geometry only)
+hud chat: sent=1 recv=3 echo=False lines=4
+  hud-chat > hello
+hud draws: … minimap=817 total=1246
+```
+
+**Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `chats=0 ChatSent=0`, minimap still `700x700 draws=819`.
+
+`MMap.Lib` not loaded (`mmapLib=101` catalog index only). NPC/quest/trade/drag-drop/audio/WebView2 stay deferred.
+
 ### Inventory / equip HUD (2026-09-09, same VM)
 
 **Input-script** `--no-gate --input-script Right,Right,Attack,Down,Attack`: **EXIT:0**

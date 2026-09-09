@@ -80,6 +80,32 @@ hud draws: inv=50 equip=136 belt=25 skill=30 chat=130 total=462
 
 Skill bar draws 8 empty stubs when `Magics` is empty (Warrior, no invented spells).
 
+## Mini-map geometry + Shared chat send (same VM, later)
+
+No invented `MMap.Lib` art. Occupancy + blip from `MapReader` size / `MapCell` / packet objects.
+
+**Input-script** `--no-gate --input-script Right,Chat:hello,Attack,Down,Attack`: **EXIT:0**
+
+```
+input Chat send 'hello' #1
+input-script done walks=2 attacks=2 chats=1 ChatSent=1 ChatRecv=3 loc=306,616 WalkAck=True
+map size 700x700 (MapReader / known cells — no invented MMap art)
+hud minimap: 700x700 blip=306,616 blips=16 draws=817 mmapLib=101 (geometry only)
+hud chat: sent=1 recv=3 lines=4
+  hud-chat > hello
+hud draws: minimap=817 total=1246
+```
+
+Windowed path: Enter starts compose, type, Enter sends the same `C.Chat`.
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+hud minimap: 700x700 blip=306,615 blips=18 draws=819
+  input   : walks=0 attacks=0 pickups=0 chats=0 ChatSent=0
+```
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio) and WebView2 stay deferred and do not block. Full WinForms NPC/quest/trade, drag-drop, mini-map, chat input, and magic targeting stay stubbed.
+86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, NPC/quest/trade windows, inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block.
