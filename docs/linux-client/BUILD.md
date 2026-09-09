@@ -105,6 +105,7 @@ dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
 | `--root <Jev>` | `chdir` to external `Configs/Envir/Maps/Server.MirDB`. Never a repo path. Env: `CRYSTAL_SERVER_ROOT`. Default if omitted: `/tmp/crystal-server-root` (throwaway). |
 | `--no-version-check` | `Settings.CheckVersion=false` (Linux has no `Mir2.Exe` hash). Stock Jev `Setup.ini` already has `CheckVersion=False`. |
 | `--allow-start-game` | `Settings.AllowStartGame=true`. Without this (and without `AdminAccount`), `S.StartGame.Result=0`. Stock Jev `Setup.ini` already has `AllowStartGame=True`; pass the flag anyway so a custom root cannot silently disable StartGame. |
+| `--test-server` | `Settings.TestServer=true`. Enables existing `@LEVEL` / `@MOB` / `@MAKE` / `@MOVE` so Client.Linux can script fight/loot/equip. |
 | `--listen-without-world` | Bind 7000 when maps/DB fail `CanStartEnvir` (login handshake only). **Ignored** when `Server.MirDB` + `*.map` exist. |
 | `--no-db-checks` | `Settings.EnforceDBChecks=false` |
 | `--seconds N` | Run then exit (CI). Full world load can take a minute before port 7000 is bound. |
@@ -145,6 +146,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--catalog` | Bake atlas catalog (fixture or operator bake-out) |
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |
+| `--no-gate` | Stop after walk (skip scripted Attack / PickUp / EquipItem) |
 | `--enter-wait-ms` | How long to wait for `MapInformation` / `UserInformation` |
 
 `Client.Linux/Mir2Test.ini` is the Mir2Test.ini-style IP/port/account file.

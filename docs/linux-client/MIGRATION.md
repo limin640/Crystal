@@ -93,8 +93,8 @@ WTL: v1 RLE + DXT-like 8-byte blocks and v2 zlib+DXT1/3/5 are decoded in softwar
 | Client.Linux after LoginSuccess: character list / `NewCharacter` / `StartGame` | Done — Shared packets; GameScene-equivalent in-map state |
 | Map/object draw via bake catalog **or** existing `.Lib` through `IRenderer` | Done — `Crystal.Assets.Maps.MapReader` + `MapView` on OpenGL/Null |
 | Walk packet sent once in-map (evidence toward walk) | Done — one `C.Walk`; not a full input map |
-| Fight / loot / equip | **Not claimed** |
-| Hard gate login→select→walk→fight→loot→equip | **Not claimed** |
+| Fight / loot / equip | **Done (Phase E)** — scripted Shared packets, not GameScene UI |
+| Hard gate login→select→walk→fight→loot→equip | Linux **verb evidence** in one session; WinForms UI / audio / input loop deferred |
 
 Exact full-world flags (operator Jev tree **outside** git — never vendor DB/maps):
 
@@ -140,15 +140,46 @@ headless Null: draws=167 floor=143 objectDraws=24
 
 Linux Release builds green: `Crystal.Assets`, `Crystal.Graphics`, `Crystal.Bake`, `Server.Library`, `Server.Linux`, `Client.Linux`.
 
-That is NewCharacter → StartGame → in-map (+ one walk ack). It is **not** fight/loot/equip and **not** the hard gate.
+That is NewCharacter → StartGame → in-map (+ one walk ack).
 
-## Still blocking fight / loot / equip (and a real walk loop)
+## Phase E checklist (this increment)
 
-1. **Input** — one scripted `C.Walk` is evidence, not a Silk.NET keymap or GameScene movement loop.
-2. **Combat / loot / equip packets** — `C.Attack`, pickup, inventory/equip are not sent or drawn as GameScene dialogs.
-3. **WinForms GameScene** — still the Windows client. Client.Linux is a packet + `MapView` equivalent, not a language rewrite of the scene graph.
-4. **Operator art** — floor/objects draw from bake catalog or a real `--data` `.Lib` tree. Missing catalog slots stay missing (low-fi remap of existing texels only). Do not invent WIL art.
-5. **Audio / WebView2** — Windows-only, later.
-6. **Version hash** — Linux server still needs `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
+| Unit | Status |
+| --- | --- |
+| Scripted `C.Attack` vs nearby / `@MOB` spawn | Done — `ObjectStruck` + `DamageIndicator` + `ObjectHealth` |
+| `C.PickUp` ground item (kill drop or seeded) | Done — `GainedItem` / bag count |
+| `C.EquipItem` from inventory | Done — `S.EquipItem.Success` + equipment slot |
+| Same session after walk | Done |
+| WinForms GameScene / Silk.NET input / audio / WebView2 | Deferred |
 
-Hard gate remains: login→select→walk→fight→loot→equip on Linux vs Crystal server.
+`--test-server` on Server.Linux sets `Settings.TestServer=true` so the **existing** `@LEVEL` / `@MOB` / `@MAKE` / `@MOVE` commands work. No invented packets.
+
+```bash
+dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
+  --root /path/to/Crystal.Database/Jev \
+  --no-version-check --allow-start-game --test-server --seconds 90
+```
+
+### Evidence (same Jev root, one Client.Linux session)
+
+```
+StartGame Result=4  WalkAck=True  User=LinuxWar loc=298,616
+@MOB Deer → ObjectMonster id=58654
+C.Attack → ObjectStruck id=58654 attacker=58298 (self)
+           DamageIndicator dmg=-6  ObjectHealth percent=76
+C.PickUp → GainedItem uid=3 name=(HP)DrugSmall bag=3
+C.EquipItem → Success=True slot=Armour name=BaseDress(M) uid=2
+FightHit=True LootOk=True EquipOk=True
+```
+
+Linux Release builds still green. Jev / Data stay outside git.
+
+## Remaining gaps (OK to defer)
+
+1. **Input loop** — scripted walk/attack, not a Silk.NET keymap or GameScene movement.
+2. **WinForms GameScene** — Client.Linux is Shared packets + `MapView`, not a language rewrite of the scene graph.
+3. **Audio / WebView2** — Windows-only.
+4. **Operator art** — floor/objects still catalog or `--data` `.Lib`; no invented WIL.
+5. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
+
+The login→select→walk→fight→loot→equip **verbs** are evidenced on Linux vs Crystal.Server.Linux. UI polish and the Windows scene host are not this gate.
