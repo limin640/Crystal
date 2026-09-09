@@ -82,33 +82,74 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 
 `--frames N` closes a windowed session after N presents (useful on a box with a display). Windowed OpenGL needs a working display **and** GLFW (`sudo apt-get install libglfw3 libgl1` on Debian/Ubuntu). Without a usable window platform the process exits 4 and tells you to use `--headless`. CI should stay on `--headless`.
 
-### Linux server + protocol attempt
+### Linux server — full Jev world (Phase D)
 
-Do **not** vendor Crystal.Database into git. Clone or copy the Jev tree to a box path:
+Do **not** vendor Crystal.Database / maps / `Server.MirDB` into git. The operator keeps a Jev tree outside the repo:
 
 ```bash
 git clone --depth 1 https://github.com/Suprcode/Crystal.Database.git /path/to/Crystal.Database
 # layout: /path/to/Crystal.Database/Jev/{Configs,Envir,Maps,Server.MirDB}
 ```
 
+When `Server.MirDB` exists **and** `Maps/*.map` files exist, Server.Linux starts the full Envir (start points, maps). **Do not pass `--listen-without-world`.** That flag is handshake-only and is ignored if a full world is present.
+
 ```bash
-# listen on 7000 even if maps/DB checks are incomplete (handshake + login)
+# EXACT flags for StartGame / in-map (full external Jev root)
 dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
   --root /path/to/Crystal.Database/Jev \
-  --no-version-check --listen-without-world --seconds 30
-
-# or, bind-only (no Envir) to prove the port:
-dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
-  --bind-probe --port 7000 --seconds 3
-
-# attempt Connected → ClientVersion → NewAccount → Login
-dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
-  --connect --ini Client.Linux/Mir2Test.ini --headless
+  --no-version-check --allow-start-game --seconds 90
 ```
 
-`Client.Linux/Mir2Test.ini` is the Mir2Test.ini-style IP/port/account file. `--no-version-check` is required because Linux has no `Mir2.Exe` hash.
+| Flag | Effect |
+| --- | --- |
+| `--root <Jev>` | `chdir` to external `Configs/Envir/Maps/Server.MirDB`. Never a repo path. Env: `CRYSTAL_SERVER_ROOT`. Default if omitted: `/tmp/crystal-server-root` (throwaway). |
+| `--no-version-check` | `Settings.CheckVersion=false` (Linux has no `Mir2.Exe` hash). Stock Jev `Setup.ini` already has `CheckVersion=False`. |
+| `--allow-start-game` | `Settings.AllowStartGame=true`. Without this (and without `AdminAccount`), `S.StartGame.Result=0`. Stock Jev `Setup.ini` already has `AllowStartGame=True`; pass the flag anyway so a custom root cannot silently disable StartGame. |
+| `--listen-without-world` | Bind 7000 when maps/DB fail `CanStartEnvir` (login handshake only). **Ignored** when `Server.MirDB` + `*.map` exist. |
+| `--no-db-checks` | `Settings.EnforceDBChecks=false` |
+| `--seconds N` | Run then exit (CI). Full world load can take a minute before port 7000 is bound. |
+| `--bind` / `--port` | Listen address (default `127.0.0.1:7000`) |
 
-A complete Jev `Maps/` + `Server.MirDB` is required for StartGame / walk. Login handshake does not need baked WIL art.
+```bash
+# handshake-only (empty / incomplete root — Phase C)
+dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
+  --root /tmp/crystal-server-root \
+  --no-version-check --listen-without-world --seconds 20
+
+# bind-only (no Envir) to prove the port:
+dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
+  --bind-probe --port 7000 --seconds 3
+```
+
+### Linux client — select → StartGame → in-map draw
+
+```bash
+# NewAccount/Login → NewCharacter (if empty) → StartGame → MapInformation
+# then draw floor/objects from bake catalog (or --data .Lib) via IRenderer
+dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
+  --connect --ini Client.Linux/Mir2Test.ini --headless \
+  --catalog Tools/Crystal.Bake/fixtures/bake-out/catalog.json \
+  --maps /path/to/Crystal.Database/Jev/Maps
+
+# login handshake only (Phase C):
+dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
+  --connect --login-only --ini Client.Linux/Mir2Test.ini --headless
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--connect` | Shared `Packet` session (Connected → version → account → select → StartGame) |
+| `--login-only` | Stop after `LoginSuccess` (no NewCharacter / StartGame) |
+| `--maps <dir>` | External Jev `Maps/` for `.map` load (`CRYSTAL_MAPS`). Not vendored. |
+| `--data <dir>` | Optional client Data tree for runtime `.Lib` via `MLibParser` (`CRYSTAL_DATA`) |
+| `--catalog` | Bake atlas catalog (fixture or operator bake-out) |
+| `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
+| `--no-walk` | Do not send the scripted `C.Walk` after enter |
+| `--enter-wait-ms` | How long to wait for `MapInformation` / `UserInformation` |
+
+`Client.Linux/Mir2Test.ini` is the Mir2Test.ini-style IP/port/account file.
+
+This is StartGame / in-map evidence, **not** fight/loot/equip parity. Login handshake does not need baked WIL art; floor draw uses the catalog or an existing `.Lib`.
 
 ## Windows Client (unchanged TFM)
 

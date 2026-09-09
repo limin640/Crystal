@@ -55,12 +55,42 @@ internal static class Program
             return 2;
         }
 
+        bool hasDb = File.Exists(Path.Combine(root, "Server.MirDB"));
+        string mapsDir = Path.Combine(root, "Maps");
+        int mapFileCount = 0;
+        if (Directory.Exists(mapsDir))
+        {
+            try
+            {
+                mapFileCount = Directory.EnumerateFiles(mapsDir, "*.map", SearchOption.AllDirectories).Count();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Maps enumeration failed: {ex.Message}");
+            }
+        }
+
+        bool hasFullWorld = hasDb && mapFileCount > 0;
+        bool askedListenWithoutWorld = args.Contains("--listen-without-world");
+
         if (args.Contains("--no-version-check"))
             Settings.CheckVersion = false;
-        if (args.Contains("--listen-without-world"))
-            Settings.ListenWithoutWorld = true;
         if (args.Contains("--no-db-checks"))
             Settings.EnforceDBChecks = false;
+        if (args.Contains("--allow-start-game"))
+            Settings.AllowStartGame = true;
+
+        if (hasFullWorld)
+        {
+            // Maps + Server.MirDB: start the real Envir. Do not handshake-only.
+            if (askedListenWithoutWorld)
+                Console.WriteLine("Maps + Server.MirDB present; ignoring --listen-without-world (full world).");
+            Settings.ListenWithoutWorld = false;
+        }
+        else if (askedListenWithoutWorld)
+        {
+            Settings.ListenWithoutWorld = true;
+        }
 
         string? bind = GetOption(args, "--bind");
         if (!string.IsNullOrWhiteSpace(bind))
@@ -71,7 +101,9 @@ internal static class Program
 
         int seconds = GetInt(args, "--seconds") ?? 0;
 
-        Console.WriteLine($"CheckVersion={Settings.CheckVersion} EnforceDBChecks={Settings.EnforceDBChecks} ListenWithoutWorld={Settings.ListenWithoutWorld}");
+        string worldMode = hasFullWorld ? "full" : (Settings.ListenWithoutWorld ? "handshake-only" : "incomplete");
+        Console.WriteLine($"WorldMode={worldMode} Server.MirDB={(hasDb ? "present" : "MISSING")} Maps={mapFileCount}");
+        Console.WriteLine($"CheckVersion={Settings.CheckVersion} EnforceDBChecks={Settings.EnforceDBChecks} ListenWithoutWorld={Settings.ListenWithoutWorld} AllowStartGame={Settings.AllowStartGame}");
         Console.WriteLine($"Bind {Settings.IPAddress}:{Settings.Port}");
         Console.WriteLine($"Database {(File.Exists(Envir.DatabasePath) ? "present" : "MISSING (will be created empty if Start runs)")}: {Path.GetFullPath(Envir.DatabasePath)}");
 
@@ -87,13 +119,15 @@ internal static class Program
 
         Envir.Main.Start();
 
-        DateTime deadline = DateTime.UtcNow.AddSeconds(seconds > 0 ? seconds : 45);
+        // Full Jev worlds load hundreds of maps before binding 7000.
+        int waitSeconds = seconds > 0 ? seconds : (hasFullWorld ? 180 : 45);
+        DateTime deadline = DateTime.UtcNow.AddSeconds(waitSeconds);
         bool listening = WaitForPort(Settings.IPAddress, Settings.Port, deadline, cts.Token);
         DrainMessages();
 
         if (!listening && !Envir.Main.Running)
         {
-            Console.Error.WriteLine("Server failed to start. Need a Crystal.Database Jev tree, or pass --listen-without-world / --bind-probe.");
+            Console.Error.WriteLine("Server failed to start. Need a Crystal.Database Jev tree with Maps + Server.MirDB, or pass --listen-without-world / --bind-probe.");
             return 3;
         }
 
@@ -191,16 +225,24 @@ internal static class Program
         Console.WriteLine("""
             Crystal.Server.Linux — Envir + game-port listener (no WinForms)
 
-            Usage:
+            Usage (full world — Maps + Server.MirDB present, no --listen-without-world):
               dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
-                --root /path/to/Crystal.Database/Jev --no-version-check --seconds 20
+                --root /path/to/Crystal.Database/Jev \
+                --no-version-check --allow-start-game --seconds 90
+
+            Handshake-only (empty / incomplete root):
+              dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
+                --root /tmp/crystal-server-root \
+                --no-version-check --listen-without-world --seconds 20
 
             Options:
               --root <dir>              External DB root (Configs/Envir/Maps/Server.MirDB). Not vendored.
               --bind <ip>               Listen address (default 127.0.0.1 from Setup.ini)
               --port <n>                Game port (default 7000)
               --no-version-check        Settings.CheckVersion=false (Linux client has no Mir2.Exe)
-              --listen-without-world    Bind 7000 even if maps/DB checks fail (handshake/login only)
+              --allow-start-game        Settings.AllowStartGame=true (StartGame Result 4; default in stock Jev Setup.ini)
+              --listen-without-world    Bind 7000 even if maps/DB checks fail (handshake/login only).
+                                        Ignored when Server.MirDB and *.map files exist — full Envir starts.
               --no-db-checks            Settings.EnforceDBChecks=false
               --seconds <n>             Run then exit (CI). 0 = until Ctrl+C
               --bind-probe              Bind 7000 without starting Envir (port-availability check)

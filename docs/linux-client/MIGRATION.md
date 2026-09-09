@@ -17,9 +17,9 @@ Data tree (WIL/WZL/WTL/Lib)
              └── OpenGLRenderer / NullRenderer (Client.Linux)
         │
         ▼
- Client.Linux: catalog DrawQuad + Shared protocol connect/login attempt
- Server.Linux: Envir listen on 7000 (external Crystal.Database Jev root)
- later: select → walk → fight → loot → equip
+ Client.Linux: catalog DrawQuad + Shared protocol connect/login/select/StartGame
+ Server.Linux: full Jev --root (Maps + Server.MirDB) without --listen-without-world
+ later: walk input + fight → loot → equip
 ```
 
 ## Design choices
@@ -72,26 +72,52 @@ bake-out/
 
 WTL: v1 RLE + DXT-like 8-byte blocks and v2 zlib+DXT1/3/5 are decoded in software. Unknown texture types stay undecoded and are counted as listed-not-decoded.
 
-## Phase C checklist (this increment)
+## Phase C checklist (accepted)
 
 | Unit | Status |
 | --- | --- |
 | `Server.Library` (`net8.0`) builds on Linux | Done |
 | `Server.Linux` console host (no WinForms) | Done |
-| Listen on 7000 (`--listen-without-world` or full Jev world) | Done (document `--root`) |
-| External Crystal.Database Jev path, not vendored | Done — see BUILD.md |
+| Listen on 7000 (`--listen-without-world` or full Jev world) | Done |
+| External Crystal.Database Jev path, not vendored | Done |
 | Client.Linux `Mir2Test.ini` IP/port + `--connect` | Done |
-| Shared `Packet` handshake: Connected → ClientVersion → NewAccount/Login | Done |
+| Shared `Packet` handshake: Connected → ClientVersion → NewAccount/Login | Done (`LoginSuccess`, empty chars, no world) |
 | Bake / IRenderer / no SlimDX on Linux | Unchanged |
-| Login → select → walk → fight → loot → equip | **Not claimed** |
 
-## Still blocking walk / fight / loot / equip
+## Phase D checklist (this increment)
 
-1. **World completeness** — StartGame needs Jev `Maps/` + `Server.MirDB` passing `CanStartEnvir` (start point + mob/item DB checks). `--listen-without-world` is handshake-only.
-2. **Client scenes on Linux** — `LoginScene` / `SelectScene` / `GameScene` still live in the WinForms Client. Client.Linux speaks packets but does not render those scenes or send walk/attack/loot/equip.
-3. **Input** — no Silk.NET input map yet.
-4. **Runtime `.Lib` / bake catalog on the scene path** — GameScene still loads `MLibrary` on Windows; Linux host has not folded that in.
+| Unit | Status |
+| --- | --- |
+| Server.Linux loads full external Jev root (`Configs/Envir/Maps/Server.MirDB`) | Done — `--root` + maps present ⇒ **no** `--listen-without-world` |
+| `--allow-start-game` / `--no-version-check` documented | Done — see BUILD.md |
+| Client.Linux after LoginSuccess: character list / `NewCharacter` / `StartGame` | Done — Shared packets; GameScene-equivalent in-map state |
+| Map/object draw via bake catalog **or** existing `.Lib` through `IRenderer` | Done — `Crystal.Assets.Maps.MapReader` + `MapView` on OpenGL/Null |
+| Walk packet sent once in-map (evidence toward walk) | Done — one `C.Walk`; not a full input map |
+| Fight / loot / equip | **Not claimed** |
+| Hard gate login→select→walk→fight→loot→equip | **Not claimed** |
+
+Exact full-world flags (operator Jev tree **outside** git — never vendor DB/maps):
+
+```bash
+dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
+  --root /path/to/Crystal.Database/Jev \
+  --no-version-check --allow-start-game --seconds 90
+
+dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
+  --connect --ini Client.Linux/Mir2Test.ini --headless \
+  --catalog Tools/Crystal.Bake/fixtures/bake-out/catalog.json \
+  --maps /path/to/Crystal.Database/Jev/Maps
+```
+
+`--listen-without-world` is ignored when `Server.MirDB` and `*.map` files exist so StartGame is not handshake-only.
+
+## Still blocking fight / loot / equip (and a real walk loop)
+
+1. **Input** — one scripted `C.Walk` is evidence, not a Silk.NET keymap or GameScene movement loop.
+2. **Combat / loot / equip packets** — `C.Attack`, pickup, inventory/equip are not sent or drawn as GameScene dialogs.
+3. **WinForms GameScene** — still the Windows client. Client.Linux is a packet + `MapView` equivalent, not a language rewrite of the scene graph.
+4. **Operator art** — floor/objects draw from bake catalog or a real `--data` `.Lib` tree. Missing catalog slots stay missing (low-fi remap of existing texels only). Do not invent WIL art.
 5. **Audio / WebView2** — Windows-only, later.
-6. **Version hash** — default `CheckVersion` wants `Mir2.Exe`. Linux server must use `--no-version-check` (or a real hash list).
+6. **Version hash** — Linux server still needs `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 
 Hard gate remains: login→select→walk→fight→loot→equip on Linux vs Crystal server.

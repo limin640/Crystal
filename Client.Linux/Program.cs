@@ -11,8 +11,8 @@ using Silk.NET.Windowing;
 namespace Client.Linux;
 
 /// <summary>
-/// Linux-capable Crystal client entry. Protocol/scenes stay on the Windows Client;
-/// this host clears and draws batched atlas quads from a bake catalog.
+/// Linux-capable Crystal client entry. Shared packets drive login → select → StartGame;
+/// floor/objects draw through IRenderer from a bake catalog or existing .Lib.
 /// </summary>
 internal static class Program
 {
@@ -21,87 +21,111 @@ internal static class Program
         bool headless = args.Any(a => a is "--headless" or "-h");
         bool connect = args.Contains("--connect");
         string? catalogPath = GetOption(args, "--catalog");
+        string? mapsRoot = GetOption(args, "--maps") ?? Environment.GetEnvironmentVariable("CRYSTAL_MAPS");
+        string? dataRoot = GetOption(args, "--data") ?? Environment.GetEnvironmentVariable("CRYSTAL_DATA");
         int width = GetInt(args, "--width") ?? 1024;
         int height = GetInt(args, "--height") ?? 768;
         int? frames = GetInt(args, "--frames");
 
+        CrystalSession? session = null;
         int connectCode = 0;
         if (connect)
-            connectCode = RunConnect(args);
-
-        if (headless)
         {
-            int drawCode = RunHeadless(catalogPath, width, height, frames ?? 1);
-            return connect ? (connectCode != 0 ? connectCode : drawCode) : drawCode;
+            session = RunConnect(args);
+            connectCode = session.ExitCode;
         }
 
-        if (connect && !args.Contains("--window"))
-            return connectCode;
+        try
+        {
+            if (headless)
+            {
+                int drawCode = RunHeadless(catalogPath, mapsRoot, dataRoot, width, height, frames ?? 1, session);
+                return connect ? (connectCode != 0 ? connectCode : drawCode) : drawCode;
+            }
 
-        return RunWindow(catalogPath, width, height, frames);
+            if (connect && !args.Contains("--window"))
+                return connectCode;
+
+            return RunWindow(catalogPath, mapsRoot, dataRoot, width, height, frames, session);
+        }
+        finally
+        {
+            session?.Dispose();
+        }
     }
 
-    static int RunConnect(string[] args)
+    static CrystalSession RunConnect(string[] args)
     {
+        var opt = new ConnectOptions();
         string iniPath = GetOption(args, "--ini") ?? Path.Combine(AppContext.BaseDirectory, "Mir2Test.ini");
-        string host = GetOption(args, "--ip") ?? "127.0.0.1";
-        int port = GetInt(args, "--port") ?? 7000;
-        string account = GetOption(args, "--account") ?? "linux";
-        string password = GetOption(args, "--password") ?? "linux1";
-        bool create = args.Contains("--new-account");
-        int waitMs = GetInt(args, "--wait-ms") ?? 1500;
+        opt.WaitMs = GetInt(args, "--wait-ms") ?? 1500;
+        opt.EnterWaitMs = GetInt(args, "--enter-wait-ms") ?? 5000;
+        opt.LoginOnly = args.Contains("--login-only");
+        opt.Walk = !args.Contains("--no-walk");
+        opt.CreateAccount = args.Contains("--new-account");
+        if (GetOption(args, "--character") is string character)
+            opt.CharacterName = character;
 
         if (File.Exists(iniPath))
         {
             var ini = new InIReader(iniPath);
-            host = ini.ReadString("Network", "IPAddress", host);
-            port = ini.ReadInt32("Network", "Port", port);
-            account = ini.ReadString("Login", "AccountID", account);
-            password = ini.ReadString("Login", "Password", password);
+            opt.Host = ini.ReadString("Network", "IPAddress", opt.Host);
+            opt.Port = ini.ReadInt32("Network", "Port", opt.Port);
+            opt.Account = ini.ReadString("Login", "AccountID", opt.Account);
+            opt.Password = ini.ReadString("Login", "Password", opt.Password);
             if (!args.Contains("--new-account"))
-                create = ini.ReadBoolean("Login", "NewAccount", create);
+                opt.CreateAccount = ini.ReadBoolean("Login", "NewAccount", opt.CreateAccount);
             Console.WriteLine($"Loaded {iniPath}");
         }
         else
             Console.WriteLine($"No ini at {iniPath}; using CLI/defaults.");
 
         if (GetOption(args, "--ip") is string ipOverride)
-            host = ipOverride;
+            opt.Host = ipOverride;
         if (GetInt(args, "--port") is int portOverride)
-            port = portOverride;
+            opt.Port = portOverride;
         if (GetOption(args, "--account") is string accOverride)
-            account = accOverride;
+            opt.Account = accOverride;
         if (GetOption(args, "--password") is string pwOverride)
-            password = pwOverride;
+            opt.Password = pwOverride;
 
-        return CrystalSession.RunAttempt(host, port, account, password, create, waitMs);
+        return CrystalSession.Run(opt);
     }
 
-    static int RunHeadless(string? catalogPath, int width, int height, int frames)
+    static int RunHeadless(string? catalogPath, string? mapsRoot, string? dataRoot, int width, int height, int frames, CrystalSession? session)
     {
         using IRenderer renderer = RendererFactory.CreateNull(width, height);
         CatalogGpu? catalog = null;
         if (catalogPath != null && File.Exists(catalogPath))
             catalog = LoadCatalogInto(renderer, catalogPath);
 
-        for (int f = 0; f < Math.Max(1, frames); f++)
+        MapView? mapView = null;
+        if (catalog != null)
+            mapView = new MapView(renderer, catalog.Textures, catalog.Sprites, dataRoot);
+
+        bool drewMap = TryLoadAndDrawMap(mapView, mapsRoot, session, renderer, width, height, frames, catalog);
+
+        if (!drewMap)
         {
-            renderer.BeginFrame(width, height);
-            renderer.Clear(Color.Black);
-            renderer.SetBlend(true, 1f, Crystal.Graphics.BlendMode.NORMAL);
-
-            if (catalog == null)
+            for (int f = 0; f < Math.Max(1, frames); f++)
             {
-                var probe = renderer.CreateSolidTexture(8, 8, Color.CornflowerBlue);
-                renderer.DrawQuad(probe, new System.Drawing.Rectangle(0, 0, 8, 8), 16, 16, 64, 64, Color.White);
-            }
-            else
-            {
-                DrawCatalog(renderer, catalog, width, height);
-            }
+                renderer.BeginFrame(width, height);
+                renderer.Clear(Color.Black);
+                renderer.SetBlend(true, 1f, Crystal.Graphics.BlendMode.NORMAL);
 
-            renderer.EndFrame();
-            renderer.Present();
+                if (catalog == null)
+                {
+                    var probe = renderer.CreateSolidTexture(8, 8, Color.CornflowerBlue);
+                    renderer.DrawQuad(probe, new System.Drawing.Rectangle(0, 0, 8, 8), 16, 16, 64, 64, Color.White);
+                }
+                else
+                {
+                    DrawCatalog(renderer, catalog, width, height);
+                }
+
+                renderer.EndFrame();
+                renderer.Present();
+            }
         }
 
         int draws = renderer is NullRenderer n ? n.DrawCount : 0;
@@ -113,12 +137,51 @@ internal static class Program
         Console.WriteLine($"  atlases : {catalog?.Textures.Count ?? 0}");
         Console.WriteLine($"  sprites : {catalog?.Sprites.Count ?? 0}");
         Console.WriteLine($"  catalog : {(catalogPath == null ? "(none)" : catalogPath)}");
+        if (mapView != null)
+        {
+            Console.WriteLine($"  map     : {mapView.MapPath ?? "(none)"} {mapView.MapWidth}x{mapView.MapHeight} loaded={mapView.MapLoaded}");
+            Console.WriteLine($"  floor   : {mapView.FloorDraws} objectDraws={mapView.ObjectDraws} skipped={mapView.SkippedCells} lowFi={mapView.LowFiRemaps}");
+        }
         Console.WriteLine("Runtime parity (login→select→walk→fight→loot→equip) is a later gate.");
+        mapView?.Dispose();
         catalog?.Dispose();
         return 0;
     }
 
-    static int RunWindow(string? catalogPath, int width, int height, int? frames)
+    static bool TryLoadAndDrawMap(MapView? mapView, string? mapsRoot, CrystalSession? session, IRenderer renderer, int width, int height, int frames, CatalogGpu? catalog)
+    {
+        if (mapView == null || session is not { InMap: true } || string.IsNullOrWhiteSpace(session.MapFileName))
+            return false;
+
+        string root = mapsRoot
+                      ?? Environment.GetEnvironmentVariable("CRYSTAL_MAPS")
+                      ?? "";
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            Console.WriteLine("In-map but no --maps / CRYSTAL_MAPS; drawing catalog sprites only.");
+            return false;
+        }
+
+        if (!mapView.LoadMap(root, session.MapFileName))
+            return false;
+
+        var objects = session.Objects.ToList();
+        for (int f = 0; f < Math.Max(1, frames); f++)
+        {
+            renderer.BeginFrame(width, height);
+            renderer.Clear(Color.FromArgb(255, 8, 12, 8));
+            renderer.SetBlend(true, 1f, Crystal.Graphics.BlendMode.NORMAL);
+            mapView.Draw(width, height, session.UserLocation, objects);
+            renderer.EndFrame();
+            renderer.Present();
+        }
+
+        Console.WriteLine($"in-map draw: file={session.MapFileName} title={session.MapTitle} origin={session.UserLocation.X},{session.UserLocation.Y} objects={objects.Count}");
+        _ = catalog;
+        return true;
+    }
+
+    static int RunWindow(string? catalogPath, string? mapsRoot, string? dataRoot, int width, int height, int? frames, CrystalSession? session)
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"))
             && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
@@ -139,6 +202,7 @@ internal static class Program
             IRenderer? renderer = null;
             GL? gl = null;
             CatalogGpu? catalog = null;
+            MapView? mapView = null;
             int frameCount = 0;
 
             window.Load += () =>
@@ -147,6 +211,10 @@ internal static class Program
                 renderer = RendererFactory.CreateOpenGL(gl, window.Size.X, window.Size.Y);
                 if (catalogPath != null && File.Exists(catalogPath))
                     catalog = LoadCatalogInto(renderer, catalogPath);
+                if (catalog != null)
+                    mapView = new MapView(renderer, catalog.Textures, catalog.Sprites, dataRoot);
+                if (mapView != null && session is { InMap: true } && !string.IsNullOrWhiteSpace(session.MapFileName) && !string.IsNullOrWhiteSpace(mapsRoot))
+                    mapView.LoadMap(mapsRoot, session.MapFileName);
             };
 
             window.Render += _ =>
@@ -154,7 +222,9 @@ internal static class Program
                 if (renderer == null) return;
                 renderer.BeginFrame(window.Size.X, window.Size.Y);
                 renderer.Clear(Color.FromArgb(255, 16, 16, 24));
-                if (catalog != null)
+                if (mapView is { MapLoaded: true } && session != null)
+                    mapView.Draw(window.Size.X, window.Size.Y, session.UserLocation, session.Objects);
+                else if (catalog != null)
                     DrawCatalog(renderer, catalog, window.Size.X, window.Size.Y);
                 else
                 {
@@ -171,6 +241,7 @@ internal static class Program
 
             window.Closing += () =>
             {
+                mapView?.Dispose();
                 catalog?.Dispose();
                 renderer?.Dispose();
                 gl?.Dispose();
