@@ -4,6 +4,7 @@ using Crystal.Assets.Atlas;
 using Crystal.Assets.Imaging;
 using Crystal.Graphics;
 using Crystal.Graphics.Backends;
+using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
@@ -12,7 +13,7 @@ namespace Client.Linux;
 
 /// <summary>
 /// Linux-capable Crystal client entry. Shared packets drive login → select → StartGame;
-/// floor/objects draw through IRenderer from a bake catalog or existing .Lib.
+/// Silk.NET input (or --input-script) walks/attacks; HUD + map through IRenderer.
 /// </summary>
 internal static class Program
 {
@@ -33,6 +34,13 @@ internal static class Program
         {
             session = RunConnect(args);
             connectCode = session.ExitCode;
+            if (GetOption(args, "--input-script") is string script && session.InMap)
+            {
+                int stepMs = GetInt(args, "--input-step-ms") ?? 400;
+                int inputCode = session.RunInputScript(InputMap.ParseScript(script), stepMs);
+                if (connectCode == 0)
+                    connectCode = inputCode;
+            }
         }
 
         try
@@ -103,8 +111,9 @@ internal static class Program
         MapView? mapView = null;
         if (catalog != null)
             mapView = new MapView(renderer, catalog.Textures, catalog.Sprites, dataRoot);
+        using var hud = new SceneHud(renderer);
 
-        bool drewMap = TryLoadAndDrawMap(mapView, mapsRoot, session, renderer, width, height, frames, catalog);
+        bool drewMap = TryLoadAndDrawMap(mapView, mapsRoot, session, renderer, width, height, frames, catalog, hud);
 
         if (!drewMap)
         {
@@ -143,14 +152,27 @@ internal static class Program
             Console.WriteLine($"  map     : {mapView.MapPath ?? "(none)"} {mapView.MapWidth}x{mapView.MapHeight} loaded={mapView.MapLoaded}");
             Console.WriteLine($"  floor   : {mapView.FloorDraws} objectDraws={mapView.ObjectDraws} skipped={mapView.SkippedCells} lowFi={mapView.LowFiRemaps}");
         }
-        Console.WriteLine("Runtime parity (login→select→walk→fight→loot→equip) is a later gate.");
+        if (session != null)
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups}");
+        Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer HUD.");
         mapView?.Dispose();
         catalog?.Dispose();
         return 0;
     }
 
-    static bool TryLoadAndDrawMap(MapView? mapView, string? mapsRoot, CrystalSession? session, IRenderer renderer, int width, int height, int frames, CatalogGpu? catalog)
+    static bool TryLoadAndDrawMap(MapView? mapView, string? mapsRoot, CrystalSession? session, IRenderer renderer, int width, int height, int frames, CatalogGpu? catalog, SceneHud? hud)
     {
+        if (session is { LoginSuccess: true, InMap: false } && hud != null)
+        {
+            renderer.BeginFrame(width, height);
+            renderer.Clear(Color.FromArgb(255, 12, 12, 20));
+            hud.DrawSelect(width, height, session);
+            renderer.EndFrame();
+            renderer.Present();
+            Console.WriteLine("select HUD drawn (IRenderer)");
+            return true;
+        }
+
         if (mapView == null || session is not { InMap: true } || string.IsNullOrWhiteSpace(session.MapFileName))
             return false;
 
@@ -173,6 +195,7 @@ internal static class Program
             renderer.Clear(Color.FromArgb(255, 8, 12, 8));
             renderer.SetBlend(true, 1f, Crystal.Graphics.BlendMode.NORMAL);
             mapView.Draw(width, height, session.UserLocation, objects);
+            hud?.DrawGame(width, height, session);
             renderer.EndFrame();
             renderer.Present();
         }
@@ -204,18 +227,76 @@ internal static class Program
             GL? gl = null;
             CatalogGpu? catalog = null;
             MapView? mapView = null;
+            SceneHud? hud = null;
+            IInputContext? input = null;
             int frameCount = 0;
+            DateTime nextHeld = DateTime.UtcNow;
+            var held = new HashSet<Key>();
 
             window.Load += () =>
             {
                 gl = window.CreateOpenGL();
                 renderer = RendererFactory.CreateOpenGL(gl, window.Size.X, window.Size.Y);
+                hud = new SceneHud(renderer);
                 if (catalogPath != null && File.Exists(catalogPath))
                     catalog = LoadCatalogInto(renderer, catalogPath);
                 if (catalog != null)
                     mapView = new MapView(renderer, catalog.Textures, catalog.Sprites, dataRoot);
                 if (mapView != null && session is { InMap: true } && !string.IsNullOrWhiteSpace(session.MapFileName) && !string.IsNullOrWhiteSpace(mapsRoot))
                     mapView.LoadMap(mapsRoot, session.MapFileName);
+
+                input = window.CreateInput();
+                foreach (var kb in input.Keyboards)
+                {
+                    kb.KeyDown += (_, key, _) =>
+                    {
+                        held.Add(key);
+                        if (session is not { InMap: true }) return;
+                        if (key is Key.Space or Key.ControlLeft or Key.Z)
+                            session.Drive(GameCommand.Attack(session.Facing));
+                        else if (key is Key.G or Key.F)
+                            session.Drive(GameCommand.PickUp());
+                        else if (TrySilkWalk(key, out var dir))
+                            session.Drive(GameCommand.Walk(dir));
+                    };
+                    kb.KeyUp += (_, key, _) => held.Remove(key);
+                }
+                foreach (var mouse in input.Mice)
+                {
+                    mouse.MouseDown += (_, btn) =>
+                    {
+                        if (session is not { InMap: true } || renderer == null) return;
+                        if (btn == MouseButton.Right)
+                        {
+                            session.Drive(GameCommand.Attack(session.Facing));
+                            return;
+                        }
+                        if (btn != MouseButton.Left) return;
+                        var pos = mouse.Position;
+                        int cellX = session.UserLocation.X + (int)(pos.X / MapView.CellWidth) - (window.Size.X / MapView.CellWidth / 2);
+                        int cellY = session.UserLocation.Y + (int)(pos.Y / MapView.CellHeight) - (window.Size.Y / MapView.CellHeight / 2);
+                        var dest = new Point(cellX, cellY);
+                        var dir = Functions.DirectionFromPoint(session.UserLocation, dest);
+                        session.Drive(GameCommand.Walk(dir));
+                        Console.WriteLine($"input mouse walk {dir} toward {cellX},{cellY}");
+                    };
+                }
+            };
+
+            window.Update += _ =>
+            {
+                session?.Pump(0);
+                if (session is not { InMap: true }) return;
+                if (DateTime.UtcNow < nextHeld) return;
+                foreach (var key in held)
+                {
+                    if (TrySilkWalk(key, out var dir))
+                    {
+                        session.Drive(GameCommand.Walk(dir));
+                        nextHeld = DateTime.UtcNow.AddMilliseconds(350);
+                        break;
+                    }
+                }
             };
 
             window.Render += _ =>
@@ -233,6 +314,11 @@ internal static class Program
                     renderer.DrawQuad(tex, null, 32, 32, 128, 128, Color.MediumPurple);
                     tex.Dispose();
                 }
+                if (hud != null && session != null)
+                {
+                    if (session.InMap) hud.DrawGame(window.Size.X, window.Size.Y, session);
+                    else if (session.LoginSuccess) hud.DrawSelect(window.Size.X, window.Size.Y, session);
+                }
                 renderer.EndFrame();
 
                 frameCount++;
@@ -242,6 +328,8 @@ internal static class Program
 
             window.Closing += () =>
             {
+                input?.Dispose();
+                hud?.Dispose();
                 mapView?.Dispose();
                 catalog?.Dispose();
                 renderer?.Dispose();
@@ -327,6 +415,32 @@ internal static class Program
     {
         string? raw = GetOption(args, name);
         return int.TryParse(raw, out int value) ? value : null;
+    }
+
+    static bool TrySilkWalk(Key key, out MirDirection dir)
+    {
+        dir = MirDirection.Right;
+        switch (key)
+        {
+            case Key.W or Key.Up or Key.Keypad8:
+                dir = MirDirection.Up; return true;
+            case Key.S or Key.Down or Key.Keypad2:
+                dir = MirDirection.Down; return true;
+            case Key.A or Key.Left or Key.Keypad4:
+                dir = MirDirection.Left; return true;
+            case Key.D or Key.Right or Key.Keypad6:
+                dir = MirDirection.Right; return true;
+            case Key.Q or Key.Keypad7:
+                dir = MirDirection.UpLeft; return true;
+            case Key.E or Key.Keypad9:
+                dir = MirDirection.UpRight; return true;
+            case Key.Keypad1:
+                dir = MirDirection.DownLeft; return true;
+            case Key.Keypad3:
+                dir = MirDirection.DownRight; return true;
+            default:
+                return false;
+        }
     }
 
     sealed class CatalogGpu : IDisposable

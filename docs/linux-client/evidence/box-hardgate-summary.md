@@ -25,7 +25,7 @@ LoginSuccess=True NewCharacterOk=True StartGameResult=4 InMap=True
 WalkAck=True FightHit=True LootOk=True EquipOk=True
 ```
 
-Deferred: WinForms GameScene UI, Silk.NET input loop, audio, WebView2. Language rewrite deferred.
+Silk.NET input + IRenderer HUD: **in progress** (headless `--input-script` + windowed WASD/mouse). Audio / WebView2 / full WinForms GameScene remain deferred. Language rewrite deferred. Catalog 86 missing slots stay pack-missing.
 
 ## Full-corpus bake — mirfiles pack A (~7.2G)
 

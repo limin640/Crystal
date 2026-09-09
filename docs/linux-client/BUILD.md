@@ -147,6 +147,9 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |
 | `--no-gate` | Stop after walk (skip scripted Attack / PickUp / EquipItem) |
+| `--input-script` | After StartGame, inject Crystal walk/attack keys (`Right,Right,Attack`) — same path as Silk.NET input |
+| `--input-step-ms` | Delay between injected commands (default 400) |
+| `--window` | Silk.NET OpenGL + keyboard/mouse after `--connect` |
 | `--enter-wait-ms` | How long to wait for `MapInformation` / `UserInformation` |
 
 `Client.Linux/Mir2Test.ini` is the Mir2Test.ini-style IP/port/account file.

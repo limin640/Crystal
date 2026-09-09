@@ -2,7 +2,7 @@
 
 ## Sequencing toward the hard done gate
 
-Hard-gate **verbs** (login → select → walk → fight → loot → equip) are evidenced on Linux vs `Server.Linux` + Shared packets. WinForms `GameScene` UI, Silk.NET input, audio, and WebView2 remain deferred. Language rewrite remains deferred.
+Hard-gate **verbs** (login → select → walk → fight → loot → equip) are evidenced on Linux vs `Server.Linux` + Shared packets. Silk.NET input + a minimum IRenderer HUD are **in progress**. Full WinForms `GameScene`, audio, and WebView2 remain deferred. Language rewrite remains deferred.
 
 This PR lands the bake/renderer levers **and** the Linux verb path. It does not vendor Data, Jev, or bake atlases.
 
@@ -17,9 +17,9 @@ Data tree (WIL/WZL/WTL/Lib)
              └── OpenGLRenderer / NullRenderer (Client.Linux)
         │
         ▼
- Client.Linux: catalog DrawQuad + Shared protocol login/select/StartGame/walk/fight/loot/equip
+ Client.Linux: Shared packets + Silk.NET input/HUD + MapView (IRenderer)
  Server.Linux: full Jev --root (Maps + Server.MirDB) without --listen-without-world
- deferred: GameScene UI, Silk.NET input, audio, WebView2
+ deferred: full WinForms GameScene, audio, WebView2
 ```
 
 ## Design choices
@@ -94,7 +94,7 @@ WTL: v1 RLE + DXT-like 8-byte blocks and v2 zlib+DXT1/3/5 are decoded in softwar
 | Map/object draw via bake catalog **or** existing `.Lib` through `IRenderer` | Done — `Crystal.Assets.Maps.MapReader` + `MapView` on OpenGL/Null |
 | Walk packet sent once in-map (evidence toward walk) | Done — one `C.Walk`; not a full input map |
 | Fight / loot / equip | **Done (Phase E)** — scripted Shared packets, not GameScene UI |
-| Hard gate login→select→walk→fight→loot→equip | **Evidenced** on CloudAgent VM and Grok Bot Linux box; WinForms UI / audio / input deferred |
+| Hard gate login→select→walk→fight→loot→equip | **Evidenced** on CloudAgent VM and Grok Bot Linux box; do not regress |
 
 Exact full-world flags (operator Jev tree **outside** git — never vendor DB/maps):
 
@@ -150,7 +150,8 @@ That is NewCharacter → StartGame → in-map (+ one walk ack).
 | `C.PickUp` ground item (kill drop or seeded) | Done — `GainedItem` / bag count |
 | `C.EquipItem` from inventory | Done — `S.EquipItem.Success` + equipment slot |
 | Same session after walk | Done |
-| WinForms GameScene / Silk.NET input / audio / WebView2 | Deferred |
+| WinForms GameScene / audio / WebView2 | Deferred (do not block) |
+| Silk.NET input + IRenderer select/game HUD | **In progress** — Shared C.Walk/C.Attack, not WinForms |
 
 `--test-server` on Server.Linux sets `Settings.TestServer=true` so the **existing** `@LEVEL` / `@MOB` / `@MAKE` / `@MOVE` commands work. No invented packets.
 
@@ -174,15 +175,48 @@ FightHit=True LootOk=True EquipOk=True
 
 Linux Release builds still green. Jev / Data stay outside git.
 
+## Client.Linux interactivity (in progress)
+
+Silk.NET windowed keyboard/mouse (WASD / arrows / numpad, Space/Ctrl attack, G pickup, left-click walk, right-click attack) drives **the same** `C.Walk` / `C.Attack` / `C.PickUp` packets as Crystal. Headless CI injects the same commands with `--input-script Right,Right,Attack`.
+
+Minimum **select** and **game HUD** (map title, loc, HP/MP bars, last chat) draw through `IRenderer` — not WinForms. Procedural 3×5 HUD glyphs are UI chrome, not WIL art.
+
+Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not invent art.
+
+### WinForms-only (stubbed on Linux — listed, not blocking)
+
+| Piece | Status |
+| --- | --- |
+| `SelectScene` / `GameScene` dialog graph | Stub — HUD + packets only |
+| `MirMessageBox`, NPC/quest/trade windows | Stub |
+| Skill bar / magic targeting | Stub |
+| Inventory / equipment / belt windows | Stub (`C.EquipItem` still works) |
+| Mini-map (`MMap.Lib`) / big map | Stub |
+| Chat input box / CMain keybind INI | Stub (last `S.Chat` line on HUD) |
+| MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
+| **Audio (NAudio)** | Deferred — do not block |
+| **WebView2** | Deferred — do not block |
+
+```bash
+# headless multi-step input after StartGame (does not replace the hard-gate --connect path)
+dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
+  --connect --headless --input-script Right,Right,Attack,Down,Attack \
+  --catalog Tools/Crystal.Bake/fixtures/bake-out/catalog.json \
+  --maps /path/to/Crystal.Database/Jev/Maps
+
+# windowed (needs DISPLAY + libglfw3)
+dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
+  --connect --window --catalog … --maps …
+```
+
 ## Remaining gaps (OK to defer)
 
-1. **Input loop** — scripted walk/attack, not a Silk.NET keymap or GameScene movement.
-2. **WinForms GameScene** — Client.Linux is Shared packets + `MapView`, not a language rewrite of the scene graph.
-3. **Audio / WebView2** — Windows-only.
-4. **Operator art** — floor/objects still catalog or `--data` `.Lib`; no invented WIL.
-5. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
+1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
+2. **Audio / WebView2** — Windows-only; documented, not a Linux verb blocker.
+3. **Operator art** — floor/objects still catalog or `--data` `.Lib`; 86 catalog slots remain missing-on-disk. No invented WIL.
+4. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 
-The login→select→walk→fight→loot→equip **verbs** are evidenced on Linux vs Crystal.Server.Linux. UI polish and the Windows scene host are not this gate.
+The login→select→walk→fight→loot→equip **verbs** stay evidenced (do not regress). Input/HUD is the next fold toward GameScene, not a replacement of that proof.
 
 ## Operator box hard gate
 

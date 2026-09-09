@@ -72,6 +72,17 @@ internal sealed class CrystalSession : IDisposable
     public IReadOnlyList<string> Log => _log;
     public IReadOnlyList<WorldObject> Objects => _objects.Values.ToList();
     public MirDirection Facing { get; private set; } = MirDirection.Right;
+    public int UserHP { get; private set; }
+    public int UserMP { get; private set; }
+    public int UserMaxHP { get; private set; }
+    public int UserMaxMP { get; private set; }
+    public ushort UserLevel { get; private set; }
+    public MirClass UserClass { get; private set; }
+    public string? LastChat { get; private set; }
+    public uint UserGold { get; private set; }
+    public int InputWalks { get; private set; }
+    public int InputAttacks { get; private set; }
+    public int InputPickups { get; private set; }
 
     public void Connect(string host, int port, int timeoutMs = 5000)
     {
@@ -82,6 +93,57 @@ internal sealed class CrystalSession : IDisposable
         _client.EndConnect(ar);
         Note($"socket connected {host}:{port}");
         BeginReceive();
+    }
+
+    /// <summary>Player-driven (keyboard/mouse or --input-script) Shared packet. Distinct from the Phase E one-shot gate.</summary>
+    public void Drive(GameCommand command)
+    {
+        if (!InMap || !SocketConnected)
+            return;
+
+        switch (command.Kind)
+        {
+            case GameCommandKind.Walk:
+                Facing = command.Direction;
+                WalkSent = true;
+                InputWalks++;
+                Send(new C.Walk { Direction = command.Direction });
+                Note($"input Walk {command.Direction} #{InputWalks} loc={UserLocation.X},{UserLocation.Y}");
+                break;
+            case GameCommandKind.Attack:
+                InputAttacks++;
+                _attacksSent++;
+                Send(new C.Attack { Direction = Facing, Spell = Spell.None });
+                Note($"input Attack {Facing} #{InputAttacks}");
+                break;
+            case GameCommandKind.PickUp:
+                InputPickups++;
+                Send(new C.PickUp());
+                Note($"input PickUp #{InputPickups}");
+                break;
+        }
+    }
+
+    public int RunInputScript(IReadOnlyList<GameCommand> commands, int stepMs)
+    {
+        if (!InMap)
+        {
+            Console.Error.WriteLine("input-script: not in-map; skip.");
+            return 0;
+        }
+
+        Console.WriteLine($"input-script {commands.Count} commands stepMs={stepMs}");
+        foreach (var cmd in commands)
+        {
+            var step = cmd;
+            if (step.Kind == GameCommandKind.Attack)
+                step = GameCommand.Attack(Facing);
+            Drive(step);
+            Pump(Math.Max(200, stepMs));
+        }
+
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} pickups={InputPickups} loc={UserLocation.X},{UserLocation.Y} WalkAck={WalkAck} FightHit={FightHit}");
+        return InputWalks > 0 && InputAttacks > 0 ? 0 : 10;
     }
 
     public void Send(Packet packet)
@@ -200,8 +262,21 @@ internal sealed class CrystalSession : IDisposable
                 Facing = user.Direction;
                 InMap = true;
                 Upsert(user.ObjectID, user.Name, user.Location, "player", "CArmour/00.Lib", 0);
+                UserHP = user.HP;
+                UserMP = user.MP;
+                UserMaxHP = Math.Max(user.HP, UserMaxHP);
+                UserMaxMP = Math.Max(user.MP, UserMaxMP);
+                UserLevel = user.Level;
+                UserClass = user.Class;
+                UserGold = user.Gold;
                 IngestUserItems(user);
                 Note($"in-map: UserInformation id={user.ObjectID} name={user.Name} class={user.Class} loc={user.Location.X},{user.Location.Y} hp={user.HP}/{user.MP} bag={_bag.Count} equip={EquippedCount()}");
+                break;
+            case S.HealthChanged hc:
+                UserHP = hc.HP;
+                UserMP = hc.MP;
+                UserMaxHP = Math.Max(UserMaxHP, hc.HP);
+                UserMaxMP = Math.Max(UserMaxMP, hc.MP);
                 break;
             case S.UserLocation loc:
                 UserLocation = loc.Location;
@@ -242,7 +317,8 @@ internal sealed class CrystalSession : IDisposable
                 break;
             case S.GainedGold gg:
                 _goldGained += gg.Gold;
-                Note($"GainedGold +{gg.Gold} totalSession={_goldGained}");
+                UserGold += gg.Gold;
+                Note($"GainedGold +{gg.Gold} totalSession={_goldGained} gold={UserGold}");
                 break;
             case S.EquipItem eq:
                 Note($"EquipItem Success={eq.Success} grid={eq.Grid} to={eq.To} uid={eq.UniqueID}");
@@ -317,6 +393,7 @@ internal sealed class CrystalSession : IDisposable
                 _objects.Remove(rem.ObjectID);
                 break;
             case S.Chat chat:
+                LastChat = chat.Message;
                 Note($"Chat [{chat.Type}] {chat.Message}");
                 break;
             case S.Disconnect d:
