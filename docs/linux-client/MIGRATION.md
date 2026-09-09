@@ -259,6 +259,28 @@ Client.Linux windowed OK frames=12 backend=Silk.NET OpenGL
 
 See [evidence/input-hud.md](evidence/input-hud.md). Catalog **86** slots remain pack-missing.
 
+### NPC talk (2026-09-09, same VM)
+
+**Input-script** `--no-gate --input-script Right,Talk,Attack`: **EXIT:0**
+
+```
+input Talk CallNPC id=7 name=Merchant_Whitney key=[@Main]
+NPCResponse lines=8
+  npc-say Hello Traveller. What can I do for you?
+  npc-say <View/@BuySell> Store.
+input Talk CallNPC buy-key [@BUYSELL]
+NPCGoods count=43 rate=1 type=Buy
+input-script done talks=1 NpcTalkOk=True npc=Merchant_Whitney
+hud npc: talkOk=True lines=3 goods=43 quests=12
+  hud-npc-say Which item would you like to Buy or Sell?
+  hud-npc-goods BaseDress(M) …
+  hud-quest Assistant's Request
+```
+
+**Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `talks=0`.
+
+Deferred: `C.BuyItem` / `C.SellItem`, player `TradeRequest`/`TradeItem`/`TradeGold`/`TradeConfirm`, inventory drag-drop, audio, WebView2. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
+
 ### Mini-map + chat send (2026-09-09, same VM)
 
 **Input-script** `--no-gate --input-script Right,Chat:hello,Attack,Down,Attack`: **EXIT:0**

@@ -106,6 +106,32 @@ hud minimap: 700x700 blip=306,615 blips=18 draws=819
   input   : walks=0 attacks=0 pickups=0 chats=0 ChatSent=0
 ```
 
+## NPC talk — CallNPC / NPCResponse (same VM, later)
+
+Same packets as GameScene left-click: `C.CallNPC` `[@Main]` then `S.NPCResponse`. Optional `[@BUYSELL]` → `S.NPCGoods`. Quest names from `S.NewQuestInfo` at enter.
+
+**Input-script** `--no-gate --input-script Right,Talk,Attack`: **EXIT:0**
+
+```
+input Talk CallNPC id=7 name=Merchant_Whitney key=[@Main]
+NPCResponse lines=8
+  npc-say Hello Traveller. What can I do for you?
+  npc-say <View/@BuySell> Store.
+CallNPC [@BUYSELL] → NPCGoods count=43 type=Buy
+input-script done talks=1 NpcTalkOk=True
+hud npc: talkOk=True name=Merchant_Whitney goods=43 quests=12
+  hud-npc-say Which item would you like to Buy or Sell?
+  hud-npc-goods BaseDress(M)
+  hud-quest Assistant's Request
+```
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+  input   : talks=0
+```
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, NPC/quest/trade windows, inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block.
+86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, `C.BuyItem`/`C.SellItem`, player trade (`TradeRequest`/`TradeItem`/`TradeGold`/`TradeConfirm`), inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed.
