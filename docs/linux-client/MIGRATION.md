@@ -219,12 +219,13 @@ Duration: ~33m52s (16:10–16:44 CST)
 | Metric | Value |
 | --- | --- |
 | Libraries parsed/discovered | **1440/1440 (100%)** |
-| Images decoded/listed | **1869869/2143132 (87.25%)** |
-| Images packed/decoded | **1869867/1869869 (~100%)** |
-| Catalog present/expected | **162/248 (65.32%)** |
+| **Non-blank image decode** | **1869869/1869869 (100%)** |
+| **Listed-slot decode** | **1869869/2143132 (87.25%)** — includes empty Mir library slots |
+| Images blank | 273263 (`listed − decoded` equals Blank exactly) |
+| Images packed/decoded | 1869867/1869869 (2 decoded-not-packed; optional packer edge) |
+| Catalog present/expected | **162/248 (65.32%)** — missing-on-disk only |
 | Missing catalog slots | **86** (listed, not synthesized) |
 | Parse failures | **0** |
-| Images blank | 273263 |
 | Atlases | 6158 (png+bc3) |
 
-Coverage is measured against files that exist. Missing Crystal catalog slots are listed, not invented. `ImageDecode < 100%` includes blanks and undecodable listed frames — do not invent pixels. The bake-out tree stays on the operator box.
+**Dual metrics.** Operator-box gap analysis: `listed − decoded == Blank` (273263). The 12.75% listed-slot gap is empty Mir library slots in the denominator, **not** a decoder bug. Non-blank decode is **100%**. Do **not** invent pixels for blanks; no decoder fix is required for that gap. Two frames decoded but not packed is an optional packer edge, not a decode failure. Catalog 162/248 is files absent from this Data tree, not invented art. Bake-out stays on the operator box.

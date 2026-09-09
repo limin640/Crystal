@@ -35,12 +35,13 @@ Duration: ~33m52s (16:10–16:44 CST)
 | Metric | Value |
 | --- | --- |
 | Libraries parsed/discovered | 1440/1440 (100%) |
-| Images decoded/listed | 1869869/2143132 (87.25%) |
-| Images packed/decoded | 1869867/1869869 (~100%) |
-| Catalog present/expected | 162/248 (65.32%) |
+| Non-blank image decode | **1869869/1869869 (100%)** |
+| Listed-slot decode | **1869869/2143132 (87.25%)** (empty Mir slots in denominator) |
+| Images blank | 273263 (`listed − decoded` == Blank) |
+| Images packed/decoded | 1869867/1869869 (2 decoded-not-packed; packer edge) |
+| Catalog present/expected | 162/248 (65.32%) — missing-on-disk only |
 | Missing catalog slots | 86 (listed, not synthesized) |
 | Parse failures | 0 |
-| Images blank | 273263 |
 | Atlases | 6158 (png+bc3) |
 
-Coverage is against files that exist. Missing Crystal catalog slots are reported, not invented. `ImageDecode < 100%` includes blanks/undecodable listed frames — do not invent pixels. Bake-out stays off-git.
+See [undecoded-gap.md](undecoded-gap.md). Bake-out stays off-git.
