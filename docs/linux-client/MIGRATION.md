@@ -312,7 +312,37 @@ FightHit=True LootOk=True EquipOk=True
   input   : talks=0 buys=0 sells=0 BuyOk=False SellOk=False
 ```
 
-Player trade stays deferred (packet names in the stub table — needs a second online character). Inventory drag-drop, audio, WebView2 stay deferred. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
+Player trade evidence is in the next section. Inventory drag-drop, audio, WebView2 stay deferred. Quest accept/turn-in UI stubbed (names only from `S.NewQuestInfo`).
+
+### Player trade — two Client.Linux sessions (2026-09-09, same VM)
+
+One login per account, so host is `linux2` / `LinuxWar2` and guest is `linux` / `LinuxWar`. They `@MOVE` to 300,616 and 299,616 and `C.Turn` to face each other. Script: `docs/linux-client/trade-two-process.sh`. Jev `MaxIP=5` — wait or restart Server.Linux before a later hard-gate if this IP was just used by both clients.
+
+**Two-process** host `--auto-trade-reply --auto-trade-confirm` + guest `Trade,TradeGold:50,TradeConfirm`: **HOST_EXIT:0 GUEST_EXIT:0**
+
+```
+host ObjectPlayer LinuxWar loc=299,616
+guest ObjectPlayer LinuxWar2 loc=300,616
+guest C.TradeRequest face=Right loc=299,616 toward LinuxWar2 300,616
+host S.TradeRequest from LinuxWar → auto C.TradeReply AcceptInvite=true
+both S.TradeAccept
+guest C.TradeGold 50 → LoseGold -50 gold 49880→49830
+host S.TradeGold offer=50 → auto C.TradeConfirm Locked=true
+guest C.TradeConfirm Locked=true
+both S.TradeConfirm success
+host gold=50 (GainedGold +50)  guest gold=49830
+TradeHandshake=True TradeDone=True
+```
+
+**Hard-gate** (no `--input-script`, after Server.Linux restart to clear MaxIP): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=57941 by self
+  loot  : PickUp ground (HP)DrugSmall at 299,615 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword
+  input   : trades=0 TradeHandshake=False TradeDone=False
+```
 
 ### Mini-map + chat send (2026-09-09, same VM)
 
@@ -330,7 +360,7 @@ hud draws: … minimap=817 total=1246
 
 **Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `chats=0 ChatSent=0`, minimap still `700x700 draws=819`.
 
-`MMap.Lib` not loaded (`mmapLib=101` catalog index only). NPC/quest/trade/drag-drop/audio/WebView2 stay deferred.
+`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest/drag-drop/audio/WebView2 stay deferred.
 
 ### Inventory / equip HUD (2026-09-09, same VM)
 

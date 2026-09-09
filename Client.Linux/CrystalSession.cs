@@ -813,6 +813,8 @@ internal sealed class CrystalSession : IDisposable
                 UserGold += gg.Gold;
                 GoldEarned += gg.Gold;
                 Note($"GainedGold +{gg.Gold} totalSession={_goldGained} gold={UserGold}");
+                if (TradeDone)
+                    TradeEvidence = $"TradeConfirm success partner={TradePartnerName ?? "-"} gold={UserGold} bag={BagCount}";
                 break;
             case S.LoseGold lg:
                 GoldSpent += lg.Gold;

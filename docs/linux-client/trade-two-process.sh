@@ -2,6 +2,7 @@
 # Two Client.Linux sessions on one Server.Linux — player trade evidence.
 # Requires Server.Linux already LISTEN on 7000 (Jev --root, --test-server, --allow-start-game).
 # Do not TCP-probe 7000. Host (linux2 / LinuxWar2) accepts; guest (linux / LinuxWar) requests + gold.
+# Jev MaxIP defaults to 5; after this pair logs out, wait or restart Server.Linux before another connect.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 export PATH="${HOME}/.dotnet:${PATH}"

@@ -151,6 +151,23 @@ hud npc: gold=49880 bag=2 buys=1 sells=1 BuyOk=True SellOk=True
 
 **Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `buys=0` `sells=0`.
 
+## Player trade — two Client.Linux processes (same VM, later)
+
+`docs/linux-client/trade-two-process.sh`. Host `linux2`/`LinuxWar2` `--auto-trade-reply --auto-trade-confirm`. Guest `linux`/`LinuxWar` `Trade,TradeGold:50,TradeConfirm`. Face each other at 299,616 / 300,616. **HOST_EXIT:0 GUEST_EXIT:0**
+
+```
+guest C.TradeRequest face=Right loc=299,616 toward LinuxWar2 300,616
+host S.TradeRequest from LinuxWar → C.TradeReply AcceptInvite=true
+both S.TradeAccept
+guest C.TradeGold 50 → LoseGold -50 gold 49880→49830
+host S.TradeGold offer=50 → C.TradeConfirm Locked=true
+guest C.TradeConfirm → both S.TradeConfirm success
+host GainedGold +50 gold=50
+TradeHandshake=True TradeDone=True
+```
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `trades=0 TradeDone=False`. Restart Server.Linux first if Jev `MaxIP=5` just counted the pair.
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, player trade (`C.TradeRequest` empty / `C.TradeReply` / `C.TradeGold` / `C.TradeConfirm` / `C.TradeCancel` / `C.DepositTradeItem` / `C.RetrieveTradeItem`; server `S.TradeRequest` / `S.TradeGold` / `S.TradeItem` / `S.TradeConfirm` / `S.TradeCancel` / `S.DepositTradeItem` / `S.RetrieveTradeItem`), inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed. Trade needs a second online character.
+86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio), WebView2, inventory drag-drop, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed.
