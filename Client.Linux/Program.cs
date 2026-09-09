@@ -62,6 +62,7 @@ internal static class Program
         opt.EnterWaitMs = GetInt(args, "--enter-wait-ms") ?? 5000;
         opt.LoginOnly = args.Contains("--login-only");
         opt.Walk = !args.Contains("--no-walk");
+        opt.PlayGate = !args.Contains("--no-gate");
         opt.CreateAccount = args.Contains("--new-account");
         if (GetOption(args, "--character") is string character)
             opt.CharacterName = character;

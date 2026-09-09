@@ -79,6 +79,8 @@ internal static class Program
             Settings.EnforceDBChecks = false;
         if (args.Contains("--allow-start-game"))
             Settings.AllowStartGame = true;
+        if (args.Contains("--test-server"))
+            Settings.TestServer = true;
 
         if (hasFullWorld)
         {
@@ -103,7 +105,7 @@ internal static class Program
 
         string worldMode = hasFullWorld ? "full" : (Settings.ListenWithoutWorld ? "handshake-only" : "incomplete");
         Console.WriteLine($"WorldMode={worldMode} Server.MirDB={(hasDb ? "present" : "MISSING")} Maps={mapFileCount}");
-        Console.WriteLine($"CheckVersion={Settings.CheckVersion} EnforceDBChecks={Settings.EnforceDBChecks} ListenWithoutWorld={Settings.ListenWithoutWorld} AllowStartGame={Settings.AllowStartGame}");
+        Console.WriteLine($"CheckVersion={Settings.CheckVersion} EnforceDBChecks={Settings.EnforceDBChecks} ListenWithoutWorld={Settings.ListenWithoutWorld} AllowStartGame={Settings.AllowStartGame} TestServer={Settings.TestServer}");
         Console.WriteLine($"Bind {Settings.IPAddress}:{Settings.Port}");
         Console.WriteLine($"Database {(File.Exists(Envir.DatabasePath) ? "present" : "MISSING (will be created empty if Start runs)")}: {Path.GetFullPath(Envir.DatabasePath)}");
 
@@ -228,7 +230,7 @@ internal static class Program
             Usage (full world — Maps + Server.MirDB present, no --listen-without-world):
               dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
                 --root /path/to/Crystal.Database/Jev \
-                --no-version-check --allow-start-game --seconds 90
+                --no-version-check --allow-start-game --test-server --seconds 90
 
             Handshake-only (empty / incomplete root):
               dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
@@ -241,6 +243,7 @@ internal static class Program
               --port <n>                Game port (default 7000)
               --no-version-check        Settings.CheckVersion=false (Linux client has no Mir2.Exe)
               --allow-start-game        Settings.AllowStartGame=true (StartGame Result 4; default in stock Jev Setup.ini)
+              --test-server             Settings.TestServer=true — enables existing @LEVEL/@MOB/@MAKE/@MOVE (no invented commands)
               --listen-without-world    Bind 7000 even if maps/DB checks fail (handshake/login only).
                                         Ignored when Server.MirDB and *.map files exist — full Envir starts.
               --no-db-checks            Settings.EnforceDBChecks=false

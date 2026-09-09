@@ -16,6 +16,7 @@ internal sealed class ConnectOptions
     public bool LoginOnly { get; set; }
     public string CharacterName { get; set; } = "LinuxWar";
     public bool Walk { get; set; } = true;
+    public bool PlayGate { get; set; } = true;
     public int WaitMs { get; set; } = 1500;
     public int EnterWaitMs { get; set; } = 5000;
 }
@@ -32,6 +33,13 @@ internal sealed class CrystalSession : IDisposable
     byte[] _raw = Array.Empty<byte>();
     readonly List<string> _log = new();
     readonly Dictionary<uint, WorldObject> _objects = new();
+    readonly Dictionary<int, ItemInfo> _itemInfos = new();
+    readonly Dictionary<ulong, UserItem> _bag = new();
+    UserItem?[] _equipment = Array.Empty<UserItem?>();
+    readonly List<GroundLoot> _ground = new();
+    int _attacksSent;
+    uint _fightTargetId;
+    uint _goldGained;
 
     public int ExitCode { get; private set; } = 5;
     public bool SocketConnected => _client.Connected;
@@ -54,8 +62,16 @@ internal sealed class CrystalSession : IDisposable
     public uint UserObjectId { get; private set; }
     public bool WalkSent { get; private set; }
     public bool WalkAck { get; private set; }
+    public bool FightHit { get; private set; }
+    public bool FightDied { get; private set; }
+    public bool LootOk { get; private set; }
+    public bool EquipOk { get; private set; }
+    public string? FightEvidence { get; private set; }
+    public string? LootEvidence { get; private set; }
+    public string? EquipEvidence { get; private set; }
     public IReadOnlyList<string> Log => _log;
     public IReadOnlyList<WorldObject> Objects => _objects.Values.ToList();
+    public MirDirection Facing { get; private set; } = MirDirection.Right;
 
     public void Connect(string host, int port, int timeoutMs = 5000)
     {
@@ -181,12 +197,15 @@ internal sealed class CrystalSession : IDisposable
                 UserObjectId = user.ObjectID;
                 UserName = user.Name;
                 UserLocation = user.Location;
+                Facing = user.Direction;
                 InMap = true;
                 Upsert(user.ObjectID, user.Name, user.Location, "player", "CArmour/00.Lib", 0);
-                Note($"in-map: UserInformation id={user.ObjectID} name={user.Name} class={user.Class} loc={user.Location.X},{user.Location.Y} hp={user.HP}/{user.MP}");
+                IngestUserItems(user);
+                Note($"in-map: UserInformation id={user.ObjectID} name={user.Name} class={user.Class} loc={user.Location.X},{user.Location.Y} hp={user.HP}/{user.MP} bag={_bag.Count} equip={EquippedCount()}");
                 break;
             case S.UserLocation loc:
                 UserLocation = loc.Location;
+                Facing = loc.Direction;
                 WalkAck = WalkSent;
                 if (_objects.TryGetValue(UserObjectId, out var self))
                     self.Location = loc.Location;
@@ -206,7 +225,83 @@ internal sealed class CrystalSession : IDisposable
                 break;
             case S.ObjectItem item:
                 Upsert(item.ObjectID, item.Name, item.Location, "item", "CArmour/00.Lib", 0);
+                _ground.Add(new GroundLoot { ObjectID = item.ObjectID, Name = item.Name, Location = item.Location, Gold = 0 });
                 Note($"ObjectItem id={item.ObjectID} name={item.Name} loc={item.Location.X},{item.Location.Y}");
+                break;
+            case S.ObjectGold gold:
+                Upsert(gold.ObjectID, $"Gold:{gold.Gold}", gold.Location, "gold", "CArmour/00.Lib", 0);
+                _ground.Add(new GroundLoot { ObjectID = gold.ObjectID, Name = $"Gold:{gold.Gold}", Location = gold.Location, Gold = gold.Gold });
+                Note($"ObjectGold id={gold.ObjectID} gold={gold.Gold} loc={gold.Location.X},{gold.Location.Y}");
+                break;
+            case S.NewItemInfo nii when nii.Info != null:
+                _itemInfos[nii.Info.Index] = nii.Info;
+                break;
+            case S.GainedItem gained when gained.Item != null:
+                _bag[gained.Item.UniqueID] = gained.Item;
+                Note($"GainedItem uid={gained.Item.UniqueID} index={gained.Item.ItemIndex} name={ItemName(gained.Item)} count={gained.Item.Count} bag={_bag.Count}");
+                break;
+            case S.GainedGold gg:
+                _goldGained += gg.Gold;
+                Note($"GainedGold +{gg.Gold} totalSession={_goldGained}");
+                break;
+            case S.EquipItem eq:
+                Note($"EquipItem Success={eq.Success} grid={eq.Grid} to={eq.To} uid={eq.UniqueID}");
+                if (eq.Success)
+                {
+                    EquipOk = true;
+                    if (_bag.TryGetValue(eq.UniqueID, out var worn))
+                    {
+                        _bag.Remove(eq.UniqueID);
+                        if (eq.To >= 0)
+                        {
+                            if (_equipment.Length <= eq.To)
+                                Array.Resize(ref _equipment, eq.To + 1);
+                            _equipment[eq.To] = worn;
+                        }
+                        EquipEvidence = $"EquipItem Success slot={(EquipmentSlot)eq.To} name={ItemName(worn)} uid={eq.UniqueID}";
+                    }
+                    else
+                        EquipEvidence = $"EquipItem Success slot={(EquipmentSlot)eq.To} uid={eq.UniqueID}";
+                    Note(EquipEvidence);
+                }
+                break;
+            case S.ObjectStruck struck:
+                Note($"ObjectStruck id={struck.ObjectID} attacker={struck.AttackerID} loc={struck.Location.X},{struck.Location.Y}");
+                if (_attacksSent > 0 && struck.AttackerID == UserObjectId && struck.ObjectID != UserObjectId)
+                {
+                    FightHit = true;
+                    FightEvidence = $"ObjectStruck id={struck.ObjectID} by self";
+                }
+                break;
+            case S.DamageIndicator dmg:
+                Note($"DamageIndicator id={dmg.ObjectID} dmg={dmg.Damage} type={dmg.Type}");
+                if (_attacksSent > 0 && dmg.ObjectID != UserObjectId && dmg.ObjectID == _fightTargetId && dmg.Damage != 0)
+                {
+                    FightHit = true;
+                    FightEvidence ??= $"DamageIndicator id={dmg.ObjectID} dmg={dmg.Damage}";
+                }
+                break;
+            case S.ObjectHealth hp:
+                Note($"ObjectHealth id={hp.ObjectID} percent={hp.Percent}");
+                if (_attacksSent > 0 && hp.ObjectID == _fightTargetId)
+                {
+                    FightHit = true;
+                    FightEvidence ??= $"ObjectHealth id={hp.ObjectID} percent={hp.Percent}";
+                }
+                break;
+            case S.ObjectDied died:
+                Note($"ObjectDied id={died.ObjectID} loc={died.Location.X},{died.Location.Y}");
+                if (_attacksSent > 0 && (died.ObjectID == _fightTargetId || FightHit))
+                {
+                    FightDied = true;
+                    FightHit = true;
+                    FightEvidence ??= $"ObjectDied id={died.ObjectID}";
+                }
+                if (_objects.TryGetValue(died.ObjectID, out var corpse))
+                    corpse.Kind = "corpse";
+                break;
+            case S.Struck:
+                Note($"Struck attacker={((S.Struck)p).AttackerID}");
                 break;
             case S.ObjectWalk ow:
                 if (_objects.TryGetValue(ow.ObjectID, out var walker))
@@ -375,11 +470,20 @@ internal sealed class CrystalSession : IDisposable
             Note($"walk sent Right; ack={WalkAck} loc={UserLocation.X},{UserLocation.Y}");
         }
 
+        if (InMap && opt.PlayGate)
+            PlayGate();
+
         Dump();
         Console.WriteLine($"LoginSuccess={LoginSuccess} NewCharacterOk={NewCharacterOk} NewCharacterResult={NewCharacterResult?.ToString() ?? "(none)"}");
         Console.WriteLine($"StartGameResult={StartGameResult?.ToString() ?? "(none)"} InMap={InMap} Map={MapFileName} Title={MapTitle} User={UserName} Loc={UserLocation.X},{UserLocation.Y} Objects={_objects.Count} WalkAck={WalkAck}");
-        Console.WriteLine("Runtime parity (login→select→walk→fight→loot→equip) is a later gate. Phase D is StartGame / in-map, not fight/loot/equip.");
+        Console.WriteLine($"FightHit={FightHit} FightDied={FightDied} LootOk={LootOk} EquipOk={EquipOk}");
+        if (FightEvidence != null) Console.WriteLine($"  fight : {FightEvidence}");
+        if (LootEvidence != null) Console.WriteLine($"  loot  : {LootEvidence}");
+        if (EquipEvidence != null) Console.WriteLine($"  equip : {EquipEvidence}");
+        Console.WriteLine("Hard gate (login→select→walk→fight→loot→equip) is claimed only when all three verbs succeed in one session.");
 
+        if (InMap && opt.PlayGate)
+            return FightHit && LootOk && EquipOk ? 0 : 9;
         if (InMap && StartGameResult is 4 or null)
             return 0;
         if (StartGameResult == 4)
@@ -396,6 +500,248 @@ internal sealed class CrystalSession : IDisposable
         }
         return 7;
     }
+
+    void PlayGate()
+    {
+        Note("Phase E: fight → loot → equip (Shared packets + existing @ commands)");
+        Chat("@LEVEL 15");
+        Pump(600);
+
+        Chat($"@MOVE {UserLocation.X + 8} {UserLocation.Y}");
+        Pump(800);
+
+        TryFight();
+        TryLoot();
+        TryEquip();
+    }
+
+    void TryFight()
+    {
+        string[] mobs = { "Chicken", "Deer", "CaveMaggot", "HookingCat", "Scarecrow", "Spider", "Wolf" };
+        foreach (string mob in mobs)
+        {
+            int before = MonsterCount();
+            Chat($"@MOB {mob}");
+            Pump(700);
+            var target = _objects.Values.LastOrDefault(o => o.Kind == "monster");
+            if (target == null || MonsterCount() <= before && !FightHit)
+            {
+                Note($"no spawn visible for {mob}");
+                continue;
+            }
+
+            Note($"fight target id={target.ObjectID} name={target.Name} loc={target.Location.X},{target.Location.Y}");
+            _fightTargetId = target.ObjectID;
+            for (int swing = 0; swing < 16 && !FightDied; swing++)
+            {
+                if (_objects.TryGetValue(target.ObjectID, out var live))
+                    target = live;
+                MirDirection dir = Functions.DirectionFromPoint(UserLocation, target.Location);
+                if (UserLocation == target.Location)
+                    dir = Facing;
+                _attacksSent++;
+                Send(new C.Attack { Direction = dir, Spell = Spell.None });
+                Pump(750);
+                if (FightHit)
+                    break;
+            }
+
+            if (!FightHit)
+            {
+                Pump(1200);
+            }
+
+            if (FightHit)
+            {
+                Note($"fight evidence: {FightEvidence} died={FightDied}");
+                return;
+            }
+        }
+
+        Note("fight: no ObjectStruck/Damage/Death after scripted Attack");
+    }
+
+    void TryLoot()
+    {
+        int bagBefore = _bag.Count;
+        uint goldBefore = _goldGained;
+        Pump(400);
+        var drop = _ground.LastOrDefault();
+        if (drop != null)
+        {
+            if (drop.Location != UserLocation)
+            {
+                Chat($"@MOVE {drop.Location.X} {drop.Location.Y}");
+                Pump(700);
+            }
+            Send(new C.PickUp());
+            Pump(700);
+            if (_bag.Count > bagBefore || _goldGained > goldBefore)
+            {
+                MarkLoot(_goldGained > goldBefore
+                    ? $"PickUp gold +{_goldGained - goldBefore} at {drop.Location.X},{drop.Location.Y}"
+                    : $"PickUp ground {drop.Name} at {drop.Location.X},{drop.Location.Y} bag {_bag.Count}");
+                return;
+            }
+            if (_ground.Count > 0)
+            {
+                Send(new C.PickUp());
+                Pump(500);
+            }
+        }
+
+        if (_bag.Count > bagBefore)
+        {
+            MarkLoot($"inventory grew after PickUp ({bagBefore}→{_bag.Count})");
+            return;
+        }
+
+        // Seeded loot: MAKE (or use bag junk), drop at feet, PickUp — still C.PickUp + GainedItem.
+        string[] seeds = { "(HP)DrugSmall", "Meat", "Dagger", "WoodenSword", "Candle" };
+        UserItem? seed = _bag.Values.FirstOrDefault(i => ItemTypeOf(i) is ItemType.Potion or ItemType.Meat or ItemType.Nothing);
+        if (seed == null)
+        {
+            int beforeMake = _bag.Count;
+            foreach (string name in seeds)
+            {
+                Chat($"@MAKE {name}");
+                Pump(500);
+                seed = _bag.Values.LastOrDefault();
+                if (_bag.Count > beforeMake)
+                    break;
+            }
+        }
+
+        if (seed == null)
+        {
+            Note("loot: no ground item and MAKE produced nothing");
+            return;
+        }
+
+        ulong uid = seed.UniqueID;
+        string seedName = ItemName(seed);
+        _bag.Remove(uid);
+        Send(new C.DropItem { UniqueID = uid, Count = Math.Max((ushort)1, seed.Count) });
+        Pump(700);
+        Chat($"@MOVE {UserLocation.X} {UserLocation.Y}");
+        Pump(200);
+        int bagMid = _bag.Count;
+        Send(new C.PickUp());
+        Pump(800);
+        if (_bag.ContainsKey(uid) || _bag.Count > bagMid)
+            MarkLoot($"PickUp seeded {seedName} uid={uid} bag={_bag.Count}");
+        else
+            Note($"loot: PickUp after drop did not restore {seedName}");
+    }
+
+    void TryEquip()
+    {
+        if (EquipOk)
+            return;
+
+        UserItem? wear = _bag.Values.FirstOrDefault(i => SlotFor(ItemTypeOf(i)) is >= 0);
+        if (wear == null)
+        {
+            string[] gear = { "WoodenSword", "Dagger", "BronzeSword", "BaseDress", "Cloth", "BronzeHelmet" };
+            int before = _bag.Count;
+            foreach (string name in gear)
+            {
+                Chat($"@MAKE {name}");
+                Pump(500);
+                wear = _bag.Values.LastOrDefault(i => SlotFor(ItemTypeOf(i)) is >= 0);
+                if (wear != null || _bag.Count > before)
+                    break;
+            }
+            wear ??= _bag.Values.LastOrDefault();
+        }
+
+        if (wear == null)
+        {
+            Note("equip: no inventory item to wear");
+            return;
+        }
+
+        int slot = SlotFor(ItemTypeOf(wear));
+        if (slot < 0) slot = (int)EquipmentSlot.Weapon;
+        Note($"equip try name={ItemName(wear)} uid={wear.UniqueID} slot={(EquipmentSlot)slot}");
+        Send(new C.EquipItem { Grid = MirGridType.Inventory, UniqueID = wear.UniqueID, To = slot });
+        Pump(800);
+        if (!EquipOk)
+            Note("equip: S.EquipItem Success=false (class/level/slot mismatch)");
+    }
+
+    void Chat(string message)
+    {
+        Send(new C.Chat { Message = message });
+    }
+
+    void MarkLoot(string evidence)
+    {
+        LootOk = true;
+        LootEvidence = evidence;
+        Note("loot evidence: " + evidence);
+    }
+
+    void IngestUserItems(S.UserInformation user)
+    {
+        _bag.Clear();
+        if (user.Inventory != null)
+        {
+            foreach (var it in user.Inventory)
+            {
+                if (it == null) continue;
+                _bag[it.UniqueID] = it;
+                Note($"  bag uid={it.UniqueID} index={it.ItemIndex} name={ItemName(it)}");
+            }
+        }
+        _equipment = user.Equipment ?? Array.Empty<UserItem?>();
+        if (user.Equipment != null)
+        {
+            for (int i = 0; i < user.Equipment.Length; i++)
+            {
+                var it = user.Equipment[i];
+                if (it == null) continue;
+                Note($"  equip[{(EquipmentSlot)i}] uid={it.UniqueID} name={ItemName(it)}");
+            }
+        }
+    }
+
+    int EquippedCount() => _equipment.Count(e => e != null);
+
+    int MonsterCount() => _objects.Values.Count(o => o.Kind == "monster");
+
+    string ItemName(UserItem item)
+    {
+        if (item.Info != null && !string.IsNullOrWhiteSpace(item.Info.Name))
+            return item.Info.Name;
+        if (_itemInfos.TryGetValue(item.ItemIndex, out var info))
+            return info.Name;
+        return $"#{item.ItemIndex}";
+    }
+
+    ItemType ItemTypeOf(UserItem item)
+    {
+        if (item.Info != null)
+            return item.Info.Type;
+        return _itemInfos.TryGetValue(item.ItemIndex, out var info) ? info.Type : ItemType.Nothing;
+    }
+
+    static int SlotFor(ItemType type) => type switch
+    {
+        ItemType.Weapon => (int)EquipmentSlot.Weapon,
+        ItemType.Armour => (int)EquipmentSlot.Armour,
+        ItemType.Helmet => (int)EquipmentSlot.Helmet,
+        ItemType.Necklace => (int)EquipmentSlot.Necklace,
+        ItemType.Bracelet => (int)EquipmentSlot.BraceletR,
+        ItemType.Ring => (int)EquipmentSlot.RingR,
+        ItemType.Amulet => (int)EquipmentSlot.Amulet,
+        ItemType.Belt => (int)EquipmentSlot.Belt,
+        ItemType.Boots => (int)EquipmentSlot.Boots,
+        ItemType.Stone => (int)EquipmentSlot.Stone,
+        ItemType.Torch => (int)EquipmentSlot.Torch,
+        ItemType.Mount => (int)EquipmentSlot.Mount,
+        _ => -1
+    };
 
     int EnsureCharacter(string preferredName)
     {
@@ -495,5 +841,13 @@ internal sealed class CrystalSession : IDisposable
     public void Dispose()
     {
         try { _client.Close(); } catch { /* ignore */ }
+    }
+
+    sealed class GroundLoot
+    {
+        public uint ObjectID;
+        public string Name = "";
+        public Point Location;
+        public uint Gold;
     }
 }
