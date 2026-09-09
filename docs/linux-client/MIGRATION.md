@@ -2,9 +2,9 @@
 
 ## Sequencing toward the hard done gate
 
-Hard gate (later): Linux client login → select → walk → fight → loot → equip against a Crystal-compatible server, with build + launch evidence.
+Hard-gate **verbs** (login → select → walk → fight → loot → equip) are evidenced on Linux vs `Server.Linux` + Shared packets. WinForms `GameScene` UI, Silk.NET input, audio, and WebView2 remain deferred. Language rewrite remains deferred.
 
-This PR lands the **levers**, not that gate.
+This PR lands the bake/renderer levers **and** the Linux verb path. It does not vendor Data, Jev, or bake atlases.
 
 ```
 Data tree (WIL/WZL/WTL/Lib)
@@ -17,9 +17,9 @@ Data tree (WIL/WZL/WTL/Lib)
              └── OpenGLRenderer / NullRenderer (Client.Linux)
         │
         ▼
- Client.Linux: catalog DrawQuad + Shared protocol connect/login/select/StartGame
+ Client.Linux: catalog DrawQuad + Shared protocol login/select/StartGame/walk/fight/loot/equip
  Server.Linux: full Jev --root (Maps + Server.MirDB) without --listen-without-world
- later: walk input + fight → loot → equip
+ deferred: GameScene UI, Silk.NET input, audio, WebView2
 ```
 
 ## Design choices
@@ -94,7 +94,7 @@ WTL: v1 RLE + DXT-like 8-byte blocks and v2 zlib+DXT1/3/5 are decoded in softwar
 | Map/object draw via bake catalog **or** existing `.Lib` through `IRenderer` | Done — `Crystal.Assets.Maps.MapReader` + `MapView` on OpenGL/Null |
 | Walk packet sent once in-map (evidence toward walk) | Done — one `C.Walk`; not a full input map |
 | Fight / loot / equip | **Done (Phase E)** — scripted Shared packets, not GameScene UI |
-| Hard gate login→select→walk→fight→loot→equip | Linux **verb evidence** in one session; WinForms UI / audio / input loop deferred |
+| Hard gate login→select→walk→fight→loot→equip | **Evidenced** on CloudAgent VM and Grok Bot Linux box; WinForms UI / audio / input deferred |
 
 Exact full-world flags (operator Jev tree **outside** git — never vendor DB/maps):
 
@@ -183,3 +183,48 @@ Linux Release builds still green. Jev / Data stay outside git.
 5. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 
 The login→select→walk→fight→loot→equip **verbs** are evidenced on Linux vs Crystal.Server.Linux. UI polish and the Windows scene host are not this gate.
+
+## Operator box hard gate
+
+Reproduced on the **Grok Bot Linux box** (not only the CloudAgent VM). Date: 2026-09-09 ~16:08 CST. Branch zipball `cursor/linux-bake-renderer-bba8` at `e9f3c9b`. Publish `Server.Linux` + `Client.Linux` Release. External Jev at an operator path (**not** in the repo).
+
+Client session **EXIT:0** proved in one run:
+
+| Verb | Evidence |
+| --- | --- |
+| Account | `NewAccount Result=8` → `LoginSuccess characters=0` |
+| Select | `NewCharacterSuccess name=LinuxWar class=Warrior` |
+| StartGame | `StartGame Result=4` → `InMap=True` BichonProvince |
+| Walk | `WalkAck=True` loc=289,616 |
+| Fight | `FightHit=True` (`ObjectStruck` by self) |
+| Loot | `LootOk=True` `PickUp` `(HP)DrugSmall` bag=4 |
+| Equip | `EquipOk=True` `EquipItem Success` slot=Weapon `WoodenSword` |
+
+Final block:
+
+```
+LoginSuccess=True NewCharacterOk=True StartGameResult=4 InMap=True
+WalkAck=True FightHit=True LootOk=True EquipOk=True
+```
+
+Do **not** vendor bake atlases, the Data pack, or DB/maps into git. Metrics and log excerpts only.
+
+## Full-corpus bake (mirfiles pack A)
+
+Real mirfiles crystal/patch Data (~7.2G), operator box, **not** in git.
+
+Flags: `--atlas-size 2048 --compress bc3`  
+Duration: ~33m52s (16:10–16:44 CST)
+
+| Metric | Value |
+| --- | --- |
+| Libraries parsed/discovered | **1440/1440 (100%)** |
+| Images decoded/listed | **1869869/2143132 (87.25%)** |
+| Images packed/decoded | **1869867/1869869 (~100%)** |
+| Catalog present/expected | **162/248 (65.32%)** |
+| Missing catalog slots | **86** (listed, not synthesized) |
+| Parse failures | **0** |
+| Images blank | 273263 |
+| Atlases | 6158 (png+bc3) |
+
+Coverage is measured against files that exist. Missing Crystal catalog slots are listed, not invented. `ImageDecode < 100%` includes blanks and undecodable listed frames — do not invent pixels. The bake-out tree stays on the operator box.
