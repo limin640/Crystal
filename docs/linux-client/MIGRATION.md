@@ -198,14 +198,14 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | NPC buy / sell (`C.BuyItem` / `C.SellItem`) | **In progress** — `--input-script Talk,Buy:0,Sell` uses existing `NPCGoods` UniqueIDs; gold/bag in logs + HUD |
 | Quest panel | **In progress** only as names from `S.NewQuestInfo` if they arrive; no accept/turn-in UI |
 | Player trade | **In progress** — two Client.Linux processes (`docs/linux-client/trade-two-process.sh`). `C.ChangeTrade` / `C.TradeRequest` / `C.TradeReply` / `C.TradeGold` / `C.DepositTradeItem` / `C.TradeConfirm` + matching `S.*`. Players must face each other. |
-| Inventory drag-drop | Stub — deferred |
+| Inventory bag move (`C.MoveItem` / `C.MergeItem`) | **In progress** — `--input-script Drag:0,8` / `Merge:from,to`; HUD slot refresh. Same packets as `MirItemCell` |
+| Mouse-drag chrome (SelectedCell ghost, WIL icons, click-to-drop) | Stub — deferred |
 | Magic targeting / skill icons (`MagIcon`) | Stub |
-| Inventory drag-drop / use-item clicks | Stub (`C.EquipItem` still works) |
 | Mini-map WIL (`MMap.Lib`) / big map | Stub — no invented map art |
 | CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
-| **Audio (NAudio)** | Deferred — do not block |
-| **WebView2** | Deferred — do not block |
+| **Audio (NAudio)** | Deferred — `Client` uses NAudio WASAPI/WaveOut on `net8.0-windows`; no ALSA/Pulse/`IRenderer` audio path. Not a Linux verb blocker |
+| **WebView2** | Deferred — Microsoft.Web.WebView2 WinForms (patcher/news). No Linux WebView2 runtime; not a verb blocker |
 
 ```bash
 # headless multi-step input after StartGame (does not replace the hard-gate --connect path)
@@ -392,7 +392,7 @@ Skill stubs drew (`skill=30`) with `skills=0` — Warrior has no `ClientMagic` y
 ## Remaining gaps (OK to defer)
 
 1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
-2. **Audio / WebView2 / drag-drop** — documented stubs; not a Linux verb blocker. NPC talk + Buy/Sell + player trade (`TradeRequest`/`TradeReply`/`TradeGold`/`TradeConfirm`) are in progress. Quest accept stays stubbed.
+2. **Audio / WebView2 / mouse-drag chrome** — documented stubs; not a Linux verb blocker. NAudio is WASAPI/WaveOut-only; WebView2 is a WinForms Evergreen control. Bag `C.MoveItem` is in progress. Quest accept stays stubbed.
 3. **Operator art** — floor/objects still catalog or `--data` `.Lib`; 86 catalog slots remain missing-on-disk. No invented WIL.
 4. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 

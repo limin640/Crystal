@@ -128,6 +128,12 @@ internal sealed class CrystalSession : IDisposable
     public string? TradeEvidence { get; private set; }
     public uint TradeGoldSeen { get; private set; }
     DateTime _lastTradeRequestUtc = DateTime.MinValue;
+    public int InputDrags { get; private set; }
+    public int InputMerges { get; private set; }
+    public bool DragOk { get; private set; }
+    public bool MergeOk { get; private set; }
+    public string? DragEvidence { get; private set; }
+    public string? MergeEvidence { get; private set; }
     public const int BeltSlotCount = 6;
     public IReadOnlyList<UserItem?> InventorySlots => _inventory;
     public IReadOnlyList<UserItem?> EquipmentSlots => _equipment;
@@ -220,6 +226,12 @@ internal sealed class CrystalSession : IDisposable
                 Note($"input Move @MOVE {command.Text}");
                 Pump(800);
                 break;
+            case GameCommandKind.Drag:
+                TryDrag(command.Slot, command.Dest);
+                break;
+            case GameCommandKind.Merge:
+                TryMerge(command.Slot, command.Dest);
+                break;
         }
     }
 
@@ -241,10 +253,12 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} BuyOk={BuyOk} SellOk={SellOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
         if (BuyEvidence != null) Console.WriteLine($"  buy : {BuyEvidence}");
         if (SellEvidence != null) Console.WriteLine($"  sell : {SellEvidence}");
         if (TradeEvidence != null) Console.WriteLine($"  trade : {TradeEvidence}");
+        if (DragEvidence != null) Console.WriteLine($"  drag : {DragEvidence}");
+        if (MergeEvidence != null) Console.WriteLine($"  merge : {MergeEvidence}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
@@ -253,6 +267,8 @@ internal sealed class CrystalSession : IDisposable
         bool wantSell = commands.Any(c => c.Kind == GameCommandKind.Sell);
         bool wantTrade = commands.Any(c => c.Kind == GameCommandKind.Trade);
         bool wantConfirm = commands.Any(c => c.Kind == GameCommandKind.TradeConfirm);
+        bool wantDrag = commands.Any(c => c.Kind == GameCommandKind.Drag);
+        bool wantMerge = commands.Any(c => c.Kind == GameCommandKind.Merge);
         if (wantWalk && InputWalks == 0) return 10;
         if (wantAtk && InputAttacks == 0) return 10;
         if (wantChat && ChatSent == 0) return 10;
@@ -261,6 +277,8 @@ internal sealed class CrystalSession : IDisposable
         if (wantSell && !SellOk) return 10;
         if (wantTrade && !TradeHandshakeOk) return 10;
         if (wantConfirm && wantTrade && !TradeDone) return 10;
+        if (wantDrag && !DragOk) return 10;
+        if (wantMerge && !MergeOk) return 10;
         return 0;
     }
 
@@ -478,6 +496,122 @@ internal sealed class CrystalSession : IDisposable
         }
         else
             Note($"sell: no gold/bag change after C.SellItem (gold={UserGold} bag={_bag.Count})");
+    }
+
+    void TryDrag(int from, int to)
+    {
+        InputDrags++;
+        EnsureInventorySize();
+        if (from < 0)
+            from = FirstOccupiedSlot();
+        if (to < 0)
+            to = FirstEmptySlot(from);
+        if (from < 0)
+        {
+            Note("drag: empty bag");
+            return;
+        }
+        if (to < 0)
+        {
+            Note("drag: no empty bag slot");
+            return;
+        }
+        if (from == to)
+        {
+            Note($"drag: from==to slot={from}");
+            return;
+        }
+        if (from >= _inventory.Length || _inventory[from] == null)
+        {
+            Note($"drag: slot {from} empty");
+            return;
+        }
+
+        string name = ItemName(_inventory[from]!);
+        ulong uid = _inventory[from]!.UniqueID;
+        string destName = _inventory[to] != null ? ItemName(_inventory[to]!) : "-";
+        Send(new C.MoveItem { Grid = MirGridType.Inventory, From = from, To = to });
+        Note($"input MoveItem Grid=Inventory from={from} to={to} name={name} uid={uid} dest={destName} #{InputDrags}");
+        Pump(800);
+        if (DragOk)
+        {
+            DragEvidence ??= $"MoveItem {name} slot {from}→{to}";
+            Note("drag evidence: " + DragEvidence);
+        }
+        else
+            Note($"drag: no S.MoveItem Success from={from} to={to}");
+    }
+
+    void TryMerge(int from, int to)
+    {
+        InputMerges++;
+        EnsureInventorySize();
+        if (from < 0 || to < 0 || from >= _inventory.Length || to >= _inventory.Length)
+        {
+            Note($"merge: bad slots from={from} to={to}");
+            return;
+        }
+        var a = _inventory[from];
+        var b = _inventory[to];
+        if (a == null || b == null)
+        {
+            Note("merge: one slot empty");
+            return;
+        }
+        Send(new C.MergeItem
+        {
+            GridFrom = MirGridType.Inventory,
+            GridTo = MirGridType.Inventory,
+            IDFrom = a.UniqueID,
+            IDTo = b.UniqueID
+        });
+        Note($"input MergeItem from={from} uid={a.UniqueID} to={to} uid={b.UniqueID} #{InputMerges}");
+        Pump(800);
+        if (MergeOk)
+        {
+            MergeEvidence ??= $"MergeItem {ItemName(b)} slots {from}+{to}";
+            Note("merge evidence: " + MergeEvidence);
+        }
+        else
+            Note("merge: no S.MergeItem Success");
+    }
+
+    void ApplyInventorySwap(int from, int to)
+    {
+        EnsureInventorySize();
+        if (from < 0 || to < 0)
+            return;
+        if (from >= _inventory.Length || to >= _inventory.Length)
+        {
+            int need = Math.Max(from, to) + 1;
+            Array.Resize(ref _inventory, need);
+        }
+        (_inventory[to], _inventory[from]) = (_inventory[from], _inventory[to]);
+    }
+
+    void EnsureInventorySize()
+    {
+        if (_inventory.Length == 0)
+            _inventory = new UserItem?[46];
+    }
+
+    int FirstOccupiedSlot()
+    {
+        for (int i = 0; i < _inventory.Length; i++)
+            if (_inventory[i] != null)
+                return i;
+        return -1;
+    }
+
+    int FirstEmptySlot(int except)
+    {
+        for (int i = BeltSlotCount; i < _inventory.Length; i++)
+            if (i != except && _inventory[i] == null)
+                return i;
+        for (int i = 0; i < _inventory.Length; i++)
+            if (i != except && _inventory[i] == null)
+                return i;
+        return -1;
     }
 
     void TryTradeRequest()
@@ -840,6 +974,36 @@ internal sealed class CrystalSession : IDisposable
                     else
                         SellEvidence = $"SellItem Success uid={sold.UniqueID} gold={UserGold} bag={_bag.Count}";
                     Note(SellEvidence);
+                }
+                break;
+            case S.MoveItem mv:
+                Note($"MoveItem Success={mv.Success} grid={mv.Grid} from={mv.From} to={mv.To}");
+                if (mv.Success && mv.Grid == MirGridType.Inventory)
+                {
+                    string moved = mv.From >= 0 && mv.From < _inventory.Length && _inventory[mv.From] != null
+                        ? ItemName(_inventory[mv.From]!)
+                        : "?";
+                    ApplyInventorySwap(mv.From, mv.To);
+                    DragOk = true;
+                    DragEvidence = $"MoveItem {moved} slot {mv.From}→{mv.To}";
+                    Note(DragEvidence);
+                }
+                break;
+            case S.MergeItem mg:
+                Note($"MergeItem Success={mg.Success} fromUid={mg.IDFrom} toUid={mg.IDTo}");
+                if (mg.Success)
+                {
+                    MergeOk = true;
+                    int fromSlot = SlotOf(mg.IDFrom);
+                    int toSlot = SlotOf(mg.IDTo);
+                    if (fromSlot >= 0 && _inventory[fromSlot] != null && toSlot >= 0 && _inventory[toSlot] != null)
+                    {
+                        _inventory[toSlot]!.Count += _inventory[fromSlot]!.Count;
+                        _bag.Remove(mg.IDFrom);
+                        _inventory[fromSlot] = null;
+                    }
+                    MergeEvidence = $"MergeItem Success from={fromSlot} to={toSlot}";
+                    Note(MergeEvidence);
                 }
                 break;
             case S.EquipItem eq:

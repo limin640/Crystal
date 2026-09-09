@@ -132,6 +132,36 @@ internal static class InputMap
             return false;
         }
 
+        if (t.Equals("Drag", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Drag:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("InvMove:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("BagMove:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("MoveItem:", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!t.Contains(':'))
+            {
+                command = GameCommand.Drag();
+                return true;
+            }
+            if (TrySlotPair(t, out int from, out int to))
+            {
+                command = GameCommand.Drag(from, to);
+                return true;
+            }
+            return false;
+        }
+
+        if (t.StartsWith("Merge:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("MergeItem:", StringComparison.OrdinalIgnoreCase))
+        {
+            if (TrySlotPair(t, out int from, out int to))
+            {
+                command = GameCommand.Merge(from, to);
+                return true;
+            }
+            return false;
+        }
+
         if (t.StartsWith("Wait:", StringComparison.OrdinalIgnoreCase))
         {
             int colon = t.IndexOf(':');
@@ -206,4 +236,16 @@ internal static class InputMap
     /// <summary>WASD / arrows / numpad — same 8-way rose as Crystal MapControl + CMain.</summary>
     public static bool TryKeyWalk(string keyName, out MirDirection dir)
         => TryDirection(keyName, out dir);
+
+    static bool TrySlotPair(string token, out int from, out int to)
+    {
+        from = to = -1;
+        int colon = token.IndexOf(':');
+        if (colon < 0 || colon + 1 >= token.Length)
+            return false;
+        string[] parts = token[(colon + 1)..].Split(new[] { ',', ':' }, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            && int.TryParse(parts[0].Trim(), out from)
+            && int.TryParse(parts[1].Trim(), out to);
+    }
 }

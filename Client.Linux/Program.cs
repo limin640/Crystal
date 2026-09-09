@@ -161,7 +161,7 @@ internal static class Program
         }
         if (session != null)
         {
-            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} drags={session.InputDrags} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} DragOk={session.DragOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
             Console.WriteLine($"  items   : bag={session.BagCount} gold={session.UserGold} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
             if (session.BuyEvidence != null)
                 Console.WriteLine($"  buy     : {session.BuyEvidence}");
@@ -169,6 +169,10 @@ internal static class Program
                 Console.WriteLine($"  sell    : {session.SellEvidence}");
             if (session.TradeEvidence != null)
                 Console.WriteLine($"  trade   : {session.TradeEvidence}");
+            if (session.DragEvidence != null)
+                Console.WriteLine($"  drag    : {session.DragEvidence}");
+            if (session.MergeEvidence != null)
+                Console.WriteLine($"  merge   : {session.MergeEvidence}");
         }
         Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
         mapView?.Dispose();
