@@ -421,9 +421,30 @@ FightHit=True LootOk=True EquipOk=True
 
 IRenderer overlay on bag/belt: gold source, cyan dest, floating quad. `hud-drag ghost=N` is the extra fill count (not WIL sprites). Windowed left-click pick/drop uses the same slot hit-test; headless keeps `Drag` / `Drag:from,to`.
 
-**Input-script** `--no-gate --input-script Drag`: evidence pending this run (ghost draw count + EXIT:0).
+**Input-script** `--no-gate --input-script Drag`: **EXIT:0**
 
-**Hard-gate** (no `--input-script`): must stay **EXIT:0** with `drags=0` and `hud-drag ghost=0`.
+```
+input MoveItem Grid=Inventory from=0 to=7 name=(HP)DrugSmall uid=6 dest=-
+S.MoveItem Success=True grid=Inventory from=0 to=7
+drag evidence: MoveItem (HP)DrugSmall slot 0→7
+hud-drag ghost=3 from=0 to=7
+  hud-bag slot=7 name=(HP)DrugSmall x1
+  hud-drag MoveItem (HP)DrugSmall slot 0→7
+  input   : drags=1 DragOk=True
+```
+
+Three extra IRenderer fills: gold source, cyan dest, floating quad. No WIL icons.
+
+**Hard-gate** (no `--input-script`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=57941 by self
+  loot  : PickUp ground (HP)DrugSmall at 302,612 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=5
+hud-drag ghost=0 from=-1 to=-1
+  input   : drags=0 DragOk=False
+```
 
 ### Linux audio — IAudio / OpenAL (2026-09-09, same VM)
 

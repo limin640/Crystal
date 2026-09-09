@@ -182,13 +182,27 @@ hud-bag slot=7 name=(HP)DrugSmall x1
 
 **Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `drags=0`.
 
-`C.MergeItem` is wired (`Merge:from,to`). SelectedCell ghost is the next increment (colored quads, no WIL icons).
+`C.MergeItem` is wired (`Merge:from,to`). SelectedCell ghost is colored quads (next section) — no WIL icons.
 
 ## Inventory SelectedCell ghost (same VM, later)
 
-`--no-gate --input-script Drag` draws IRenderer gold/cyan overlays + a floating quad. Evidence line: `hud-drag ghost=N from=X to=Y`. Headless tokens unchanged. Windowed left-click pick/drop when Silk.NET mouse coords exist.
+`--no-gate --input-script Drag` draws IRenderer gold/cyan overlays + a floating quad. Headless tokens unchanged. Windowed left-click pick/drop when Silk.NET mouse coords exist. **EXIT:0**
 
-**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `drags=0`, `hud-drag ghost=0`.
+```
+input MoveItem Grid=Inventory from=0 to=7 name=(HP)DrugSmall
+S.MoveItem Success=True from=0 to=7
+hud-drag ghost=3 from=0 to=7
+  hud-bag slot=7 name=(HP)DrugSmall x1
+  input   : drags=1 DragOk=True
+```
+
+**Hard-gate** `--connect --headless` (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `drags=0`, `hud-drag ghost=0`.
+
+```
+FightHit=True LootOk=True EquipOk=True
+hud-drag ghost=0 from=-1 to=-1
+  input   : drags=0 DragOk=False
+```
 
 ## Linux audio — IAudio / Silk.NET OpenAL (same VM, later)
 
