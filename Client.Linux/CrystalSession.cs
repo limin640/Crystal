@@ -116,6 +116,18 @@ internal sealed class CrystalSession : IDisposable
     public int InputSells { get; private set; }
     public uint GoldSpent { get; private set; }
     public uint GoldEarned { get; private set; }
+    public bool AutoTradeReply { get; set; }
+    public bool AutoTradeConfirm { get; set; }
+    public int InputTrades { get; private set; }
+    public bool TradeHandshakeOk { get; private set; }
+    public bool TradeDone { get; private set; }
+    public bool TradeGoldOk { get; private set; }
+    public bool TradeDepositOk { get; private set; }
+    public string? TradePartnerName { get; private set; }
+    public string? TradeInviteFrom { get; private set; }
+    public string? TradeEvidence { get; private set; }
+    public uint TradeGoldSeen { get; private set; }
+    DateTime _lastTradeRequestUtc = DateTime.MinValue;
     public const int BeltSlotCount = 6;
     public IReadOnlyList<UserItem?> InventorySlots => _inventory;
     public IReadOnlyList<UserItem?> EquipmentSlots => _equipment;
@@ -175,6 +187,39 @@ internal sealed class CrystalSession : IDisposable
             case GameCommandKind.Sell:
                 TrySell(command.Slot);
                 break;
+            case GameCommandKind.AllowTrade:
+                Send(new C.ChangeTrade { AllowTrade = true });
+                Note("input AllowTrade C.ChangeTrade AllowTrade=true");
+                break;
+            case GameCommandKind.Trade:
+                TryTradeRequest();
+                break;
+            case GameCommandKind.TradeAccept:
+                SendTradeReply(true);
+                break;
+            case GameCommandKind.TradeGold:
+                TryTradeGold((uint)Math.Max(1, command.Slot));
+                break;
+            case GameCommandKind.TradeItem:
+                TryTradeDeposit(command.Slot);
+                break;
+            case GameCommandKind.TradeConfirm:
+                SendTradeConfirm();
+                break;
+            case GameCommandKind.Face:
+                Facing = command.Direction;
+                Send(new C.Turn { Direction = command.Direction });
+                Note($"input Face {command.Direction} loc={UserLocation.X},{UserLocation.Y}");
+                break;
+            case GameCommandKind.Wait:
+                Note($"input Wait {command.Slot}ms");
+                Pump(Math.Max(0, command.Slot));
+                break;
+            case GameCommandKind.Move:
+                Chat("@MOVE " + command.Text);
+                Note($"input Move @MOVE {command.Text}");
+                Pump(800);
+                break;
         }
     }
 
@@ -196,21 +241,26 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} BuyOk={BuyOk} SellOk={SellOk} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} npc={NpcName} loc={UserLocation.X},{UserLocation.Y}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} BuyOk={BuyOk} SellOk={SellOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
         if (BuyEvidence != null) Console.WriteLine($"  buy : {BuyEvidence}");
         if (SellEvidence != null) Console.WriteLine($"  sell : {SellEvidence}");
+        if (TradeEvidence != null) Console.WriteLine($"  trade : {TradeEvidence}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
         bool wantTalk = commands.Any(c => c.Kind == GameCommandKind.Talk);
         bool wantBuy = commands.Any(c => c.Kind == GameCommandKind.Buy);
         bool wantSell = commands.Any(c => c.Kind == GameCommandKind.Sell);
+        bool wantTrade = commands.Any(c => c.Kind == GameCommandKind.Trade);
+        bool wantConfirm = commands.Any(c => c.Kind == GameCommandKind.TradeConfirm);
         if (wantWalk && InputWalks == 0) return 10;
         if (wantAtk && InputAttacks == 0) return 10;
         if (wantChat && ChatSent == 0) return 10;
         if (wantTalk && !NpcTalkOk) return 10;
         if (wantBuy && !BuyOk) return 10;
         if (wantSell && !SellOk) return 10;
+        if (wantTrade && !TradeHandshakeOk) return 10;
+        if (wantConfirm && wantTrade && !TradeDone) return 10;
         return 0;
     }
 
@@ -428,6 +478,143 @@ internal sealed class CrystalSession : IDisposable
         }
         else
             Note($"sell: no gold/bag change after C.SellItem (gold={UserGold} bag={_bag.Count})");
+    }
+
+    void TryTradeRequest()
+    {
+        InputTrades++;
+        WorldObject? other = NearestPlayer();
+        if (other == null)
+        {
+            Note("trade: no ObjectPlayer yet; wait");
+            Pump(2500);
+            other = NearestPlayer();
+        }
+        if (other == null)
+        {
+            Note("trade: still no other player in range");
+            return;
+        }
+
+        if (Chebyshev(UserLocation, other.Location) > 1)
+        {
+            int standX = other.Location.X - 1;
+            int standY = other.Location.Y;
+            Note($"trade: approach {other.Name} {other.Location.X},{other.Location.Y} via @MOVE {standX} {standY}");
+            Chat($"@MOVE {standX} {standY}");
+            Pump(900);
+        }
+
+        FaceToward(other.Location);
+        Pump(400);
+
+        var wait = DateTime.UtcNow - _lastTradeRequestUtc;
+        if (wait.TotalMilliseconds < 2100)
+            Pump(2100 - (int)wait.TotalMilliseconds);
+
+        _lastTradeRequestUtc = DateTime.UtcNow;
+        Send(new C.TradeRequest());
+        Note($"input TradeRequest face={Facing} loc={UserLocation.X},{UserLocation.Y} toward {other.Name} {other.Location.X},{other.Location.Y} #{InputTrades}");
+        Pump(1600);
+
+        if (!TradeHandshakeOk)
+        {
+            Note("trade: no S.TradeAccept; face again and retry once");
+            FaceToward(other.Location);
+            Pump(2200);
+            Send(new C.TradeRequest());
+            Note($"input TradeRequest retry toward {other.Name}");
+            Pump(1600);
+        }
+    }
+
+    void TryTradeGold(uint amount)
+    {
+        if (!TradeHandshakeOk)
+            Note("trade gold: no handshake yet; send anyway");
+        if (UserGold < amount)
+        {
+            Note($"trade gold: low gold; @GIVEGOLD {amount + 100} (test-server)");
+            Chat($"@GIVEGOLD {amount + 100}");
+            Pump(600);
+        }
+        uint goldBefore = UserGold;
+        Send(new C.TradeGold { Amount = amount });
+        Note($"input TradeGold amount={amount} gold={UserGold}");
+        Pump(800);
+        if (UserGold < goldBefore || GoldSpent > 0)
+        {
+            TradeGoldOk = true;
+            TradeEvidence = $"TradeGold {amount} gold {goldBefore}→{UserGold} partner={TradePartnerName ?? "-"}";
+            Note("trade gold evidence: " + TradeEvidence);
+        }
+    }
+
+    void TryTradeDeposit(int bagIndex)
+    {
+        int from = bagIndex;
+        if (from < 0 || from >= _inventory.Length || _inventory[from] == null)
+        {
+            from = -1;
+            for (int i = 0; i < _inventory.Length; i++)
+            {
+                if (_inventory[i] != null)
+                {
+                    from = i;
+                    break;
+                }
+            }
+        }
+        if (from < 0)
+        {
+            Note("trade item: empty bag");
+            return;
+        }
+        var item = _inventory[from];
+        Send(new C.DepositTradeItem { From = from, To = 0 });
+        Note($"input DepositTradeItem from={from} to=0 name={ItemName(item!)} uid={item!.UniqueID}");
+        Pump(800);
+    }
+
+    void SendTradeReply(bool accept)
+    {
+        Send(new C.TradeReply { AcceptInvite = accept });
+        Note($"input TradeReply AcceptInvite={accept} from={TradeInviteFrom ?? "-"}");
+        Pump(400);
+    }
+
+    void SendTradeConfirm()
+    {
+        Send(new C.TradeConfirm { Locked = true });
+        Note($"input TradeConfirm Locked=true partner={TradePartnerName ?? "-"}");
+        Pump(800);
+        if (TradeDone)
+            TradeEvidence ??= $"TradeConfirm done partner={TradePartnerName} gold={UserGold} bag={BagCount}";
+    }
+
+    void FaceToward(Point target)
+    {
+        var dir = Functions.DirectionFromPoint(UserLocation, target);
+        Facing = dir;
+        Send(new C.Turn { Direction = dir });
+        Note($"trade Face {dir} toward {target.X},{target.Y}");
+    }
+
+    WorldObject? NearestPlayer()
+    {
+        return _objects.Values
+            .Where(o => o.Kind == "player" && o.ObjectID != UserObjectId
+                && !string.Equals(o.Name, UserName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(o => Chebyshev(UserLocation, o.Location))
+            .FirstOrDefault();
+    }
+
+    void MaybeAutoConfirm(string reason)
+    {
+        if (!AutoTradeConfirm || !TradeHandshakeOk || TradeDone)
+            return;
+        Send(new C.TradeConfirm { Locked = true });
+        Note($"auto TradeConfirm Locked=true ({reason})");
     }
 
     void TryBuyKeyFromDialog(uint npcId)
@@ -723,6 +910,16 @@ internal sealed class CrystalSession : IDisposable
                 }
                 Note($"ObjectWalk id={ow.ObjectID} loc={ow.Location.X},{ow.Location.Y} dir={ow.Direction}");
                 break;
+            case S.ObjectTurn ot:
+                if (_objects.TryGetValue(ot.ObjectID, out var turner))
+                    turner.Location = ot.Location;
+                if (ot.ObjectID == UserObjectId)
+                {
+                    UserLocation = ot.Location;
+                    Facing = ot.Direction;
+                }
+                Note($"ObjectTurn id={ot.ObjectID} loc={ot.Location.X},{ot.Location.Y} dir={ot.Direction}");
+                break;
             case S.ObjectRemove rem:
                 _objects.Remove(rem.ObjectID);
                 break;
@@ -770,6 +967,56 @@ internal sealed class CrystalSession : IDisposable
             case S.NPCUpdate nup:
                 NpcObjectId = nup.NPCID;
                 Note($"NPCUpdate id={nup.NPCID}");
+                break;
+            case S.TradeRequest tr:
+                TradeInviteFrom = tr.Name;
+                Note($"TradeRequest from {tr.Name}");
+                if (AutoTradeReply)
+                {
+                    Send(new C.TradeReply { AcceptInvite = true });
+                    Note($"auto TradeReply AcceptInvite=true from={tr.Name}");
+                }
+                break;
+            case S.TradeAccept acc:
+                TradeHandshakeOk = true;
+                TradePartnerName = acc.Name;
+                TradeEvidence ??= $"TradeAccept partner={acc.Name}";
+                Note($"TradeAccept partner={acc.Name}");
+                break;
+            case S.TradeGold tg:
+                TradeGoldSeen = tg.Amount;
+                TradeGoldOk = true;
+                Note($"TradeGold offer={tg.Amount} partner={TradePartnerName ?? "-"}");
+                MaybeAutoConfirm("TradeGold");
+                break;
+            case S.TradeItem ti:
+                int filled = ti.TradeItems?.Count(x => x != null) ?? 0;
+                Note($"TradeItem slots={ti.TradeItems?.Length ?? 0} filled={filled}");
+                MaybeAutoConfirm("TradeItem");
+                break;
+            case S.TradeConfirm:
+                TradeDone = true;
+                TradeEvidence = $"TradeConfirm success partner={TradePartnerName ?? "-"} gold={UserGold} bag={BagCount}";
+                Note(TradeEvidence);
+                break;
+            case S.TradeCancel tc:
+                Note($"TradeCancel Unlock={tc.Unlock} partner={TradePartnerName ?? "-"}");
+                break;
+            case S.DepositTradeItem dep:
+                Note($"DepositTradeItem Success={dep.Success} from={dep.From} to={dep.To}");
+                if (dep.Success)
+                {
+                    TradeDepositOk = true;
+                    if (dep.From >= 0 && dep.From < _inventory.Length)
+                    {
+                        var moved = _inventory[dep.From];
+                        if (moved != null)
+                        {
+                            _bag.Remove(moved.UniqueID);
+                            _inventory[dep.From] = null;
+                        }
+                    }
+                }
                 break;
             case S.NewQuestInfo nq when nq.Info != null:
                 if (QuestNames.Count < 12 && !string.IsNullOrWhiteSpace(nq.Info.Name))

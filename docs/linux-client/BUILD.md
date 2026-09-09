@@ -147,7 +147,10 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |
 | `--no-gate` | Stop after walk (skip scripted Attack / PickUp / EquipItem) |
-| `--input-script` | After StartGame, inject Crystal keys (`Right,Talk,Buy:0,Sell,Chat:hello,Attack`). `Talk` → `C.CallNPC` `[@Main]` then `[@BUYSELL]`; `Buy`/`Buy:N` → `C.BuyItem` from `S.NPCGoods`; `Sell`/`Sell:N` → `C.SellItem` |
+| `--input-script` | After StartGame, inject Crystal keys (`Right,Talk,Buy:0,Sell,Trade,TradeGold:50,TradeConfirm`). `Talk` → `C.CallNPC`; `Buy`/`Sell` → NPC goods; `Trade` → `C.TradeRequest` (must face partner); `AllowTrade` → `C.ChangeTrade`; `TradeGold:N` / `TradeItem` / `TradeConfirm` |
+| `--auto-trade-reply` | On `S.TradeRequest`, send `C.TradeReply` `AcceptInvite=true` |
+| `--auto-trade-confirm` | On `S.TradeGold` / `S.TradeItem`, send `C.TradeConfirm` `Locked=true` |
+| `--keep-alive <ms>` | Pump after the input script so a second client can finish the trade |
 | `--input-step-ms` | Delay between injected commands (default 400) |
 | `--window` | Silk.NET OpenGL + keyboard/mouse after `--connect` (inventory/equip HUD on IRenderer) |
 | `--enter-wait-ms` | How long to wait for `MapInformation` / `UserInformation` |

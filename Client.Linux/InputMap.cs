@@ -72,6 +72,88 @@ internal static class InputMap
             return true;
         }
 
+        if (t.Equals("AllowTrade", StringComparison.OrdinalIgnoreCase))
+        {
+            command = GameCommand.AllowTrade();
+            return true;
+        }
+
+        if (t.Equals("Trade", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("TradeRequest", StringComparison.OrdinalIgnoreCase))
+        {
+            command = GameCommand.Trade();
+            return true;
+        }
+
+        if (t.Equals("TradeAccept", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("TradeReply", StringComparison.OrdinalIgnoreCase))
+        {
+            command = GameCommand.TradeAccept();
+            return true;
+        }
+
+        if (t.Equals("TradeConfirm", StringComparison.OrdinalIgnoreCase))
+        {
+            command = GameCommand.TradeConfirm();
+            return true;
+        }
+
+        if (t.Equals("TradeGold", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("TradeGold:", StringComparison.OrdinalIgnoreCase))
+        {
+            int amount = 50;
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+                int.TryParse(t[(colon + 1)..].Trim(), out amount);
+            command = GameCommand.TradeGold(Math.Max(1, amount));
+            return true;
+        }
+
+        if (t.Equals("TradeItem", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("TradeItem:", StringComparison.OrdinalIgnoreCase))
+        {
+            int idx = -1;
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+                int.TryParse(t[(colon + 1)..].Trim(), out idx);
+            command = GameCommand.TradeItem(idx);
+            return true;
+        }
+
+        if (t.StartsWith("Face:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Turn:", StringComparison.OrdinalIgnoreCase))
+        {
+            int colon = t.IndexOf(':');
+            if (colon >= 0 && TryDirection(t[(colon + 1)..].Trim(), out var face))
+            {
+                command = GameCommand.Face(face);
+                return true;
+            }
+            return false;
+        }
+
+        if (t.StartsWith("Wait:", StringComparison.OrdinalIgnoreCase))
+        {
+            int colon = t.IndexOf(':');
+            int ms = 1000;
+            if (colon >= 0)
+                int.TryParse(t[(colon + 1)..].Trim(), out ms);
+            command = GameCommand.Wait(Math.Max(0, ms));
+            return true;
+        }
+
+        if (t.StartsWith("Move:", StringComparison.OrdinalIgnoreCase))
+        {
+            string rest = t[5..];
+            string[] parts = rest.Split(new[] { ':', ',', 'x', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && int.TryParse(parts[0], out int mx) && int.TryParse(parts[1], out int my))
+            {
+                command = GameCommand.Move(mx, my);
+                return true;
+            }
+            return false;
+        }
+
         if (t.Equals("Talk", StringComparison.OrdinalIgnoreCase)
             || t.Equals("NPC", StringComparison.OrdinalIgnoreCase)
             || t.Equals("Npc", StringComparison.OrdinalIgnoreCase))

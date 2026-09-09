@@ -10,7 +10,16 @@ internal enum GameCommandKind
     Chat,
     Talk,
     Buy,
-    Sell
+    Sell,
+    AllowTrade,
+    Trade,
+    TradeAccept,
+    TradeGold,
+    TradeItem,
+    TradeConfirm,
+    Face,
+    Wait,
+    Move
 }
 
 internal readonly struct GameCommand
@@ -27,4 +36,13 @@ internal readonly struct GameCommand
     public static GameCommand Talk() => new() { Kind = GameCommandKind.Talk, Text = "", Slot = 0 };
     public static GameCommand Buy(int goodsIndex) => new() { Kind = GameCommandKind.Buy, Text = "", Slot = goodsIndex };
     public static GameCommand Sell(int bagIndex = -1) => new() { Kind = GameCommandKind.Sell, Text = "", Slot = bagIndex };
+    public static GameCommand AllowTrade() => new() { Kind = GameCommandKind.AllowTrade, Text = "", Slot = 0 };
+    public static GameCommand Trade() => new() { Kind = GameCommandKind.Trade, Text = "", Slot = 0 };
+    public static GameCommand TradeAccept() => new() { Kind = GameCommandKind.TradeAccept, Text = "", Slot = 0 };
+    public static GameCommand TradeGold(int amount) => new() { Kind = GameCommandKind.TradeGold, Text = "", Slot = amount };
+    public static GameCommand TradeItem(int bagIndex = -1) => new() { Kind = GameCommandKind.TradeItem, Text = "", Slot = bagIndex };
+    public static GameCommand TradeConfirm() => new() { Kind = GameCommandKind.TradeConfirm, Text = "", Slot = 0 };
+    public static GameCommand Face(MirDirection d) => new() { Kind = GameCommandKind.Face, Direction = d, Text = "", Slot = 0 };
+    public static GameCommand Wait(int milliseconds) => new() { Kind = GameCommandKind.Wait, Text = "", Slot = milliseconds };
+    public static GameCommand Move(int x, int y) => new() { Kind = GameCommandKind.Move, Text = $"{x} {y}", Slot = 0 };
 }

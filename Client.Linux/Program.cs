@@ -34,12 +34,19 @@ internal static class Program
         {
             session = RunConnect(args);
             connectCode = session.ExitCode;
+            session.AutoTradeReply = args.Contains("--auto-trade-reply");
+            session.AutoTradeConfirm = args.Contains("--auto-trade-confirm");
             if (GetOption(args, "--input-script") is string script && session.InMap)
             {
                 int stepMs = GetInt(args, "--input-step-ms") ?? 400;
                 int inputCode = session.RunInputScript(InputMap.ParseScript(script), stepMs);
                 if (connectCode == 0)
                     connectCode = inputCode;
+            }
+            if (GetInt(args, "--keep-alive") is int keepMs && keepMs > 0 && session.InMap)
+            {
+                Console.WriteLine($"keep-alive {keepMs}ms");
+                session.Pump(keepMs);
             }
         }
 
@@ -154,12 +161,14 @@ internal static class Program
         }
         if (session != null)
         {
-            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk}");
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
             Console.WriteLine($"  items   : bag={session.BagCount} gold={session.UserGold} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
             if (session.BuyEvidence != null)
                 Console.WriteLine($"  buy     : {session.BuyEvidence}");
             if (session.SellEvidence != null)
                 Console.WriteLine($"  sell    : {session.SellEvidence}");
+            if (session.TradeEvidence != null)
+                Console.WriteLine($"  trade   : {session.TradeEvidence}");
         }
         Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
         mapView?.Dispose();
