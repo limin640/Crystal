@@ -154,7 +154,7 @@ internal static class Program
         }
         if (session != null)
         {
-            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} ChatSent={session.ChatSent} ChatRecv={session.ChatRecv} ChatEcho={session.ChatEcho}");
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} NpcTalkOk={session.NpcTalkOk}");
             Console.WriteLine($"  items   : bag={session.BagCount} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
         }
         Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
@@ -280,6 +280,8 @@ internal static class Program
                             session.BeginChat();
                         else if (key is Key.Space or Key.ControlLeft or Key.Z)
                             session.Drive(GameCommand.Attack(session.Facing));
+                        else if (key is Key.T)
+                            session.Drive(GameCommand.Talk());
                         else if (key is Key.G or Key.F)
                             session.Drive(GameCommand.PickUp());
                         else if (TrySilkWalk(key, out var dir))

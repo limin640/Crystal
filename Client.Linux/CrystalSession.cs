@@ -96,6 +96,15 @@ internal sealed class CrystalSession : IDisposable
     public bool ChatComposing { get; private set; }
     public string ChatDraft { get; private set; } = "";
     string _lastSentChat = "";
+    public int InputTalks { get; private set; }
+    public bool NpcTalkOk { get; private set; }
+    public uint NpcObjectId { get; private set; }
+    public string? NpcName { get; private set; }
+    public List<string> NpcDialogLines { get; } = new();
+    public List<string> NpcGoods { get; } = new();
+    public List<string> QuestNames { get; } = new();
+    public int NpcCallSent { get; private set; }
+    uint _defaultNpcId;
     public const int BeltSlotCount = 6;
     public IReadOnlyList<UserItem?> InventorySlots => _inventory;
     public IReadOnlyList<UserItem?> EquipmentSlots => _equipment;
@@ -146,6 +155,9 @@ internal sealed class CrystalSession : IDisposable
             case GameCommandKind.Chat:
                 SendChat(command.Text);
                 break;
+            case GameCommandKind.Talk:
+                TryTalk();
+                break;
         }
     }
 
@@ -167,13 +179,15 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} pickups={InputPickups} chats={InputChats} ChatSent={ChatSent} ChatRecv={ChatRecv} ChatEcho={ChatEcho} loc={UserLocation.X},{UserLocation.Y} WalkAck={WalkAck} FightHit={FightHit}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} pickups={InputPickups} chats={InputChats} talks={InputTalks} NpcTalkOk={NpcTalkOk} npc={NpcName} loc={UserLocation.X},{UserLocation.Y} WalkAck={WalkAck} FightHit={FightHit}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
+        bool wantTalk = commands.Any(c => c.Kind == GameCommandKind.Talk);
         if (wantWalk && InputWalks == 0) return 10;
         if (wantAtk && InputAttacks == 0) return 10;
         if (wantChat && ChatSent == 0) return 10;
+        if (wantTalk && !NpcTalkOk) return 10;
         return 0;
     }
 
@@ -232,6 +246,101 @@ internal sealed class CrystalSession : IDisposable
         LastChat = $"> {text}";
         Send(new C.Chat { Message = text });
         Note($"input Chat send '{text}' #{ChatSent}");
+    }
+
+    void TryTalk()
+    {
+        InputTalks++;
+        var npcs = NpcsByDistance();
+        if (npcs.Count == 0)
+        {
+            Note("talk: no ObjectNPC in view; @MOVE 289 617 (test-server BorderVillage)");
+            Chat("@MOVE 289 617");
+            Pump(900);
+            npcs = NpcsByDistance();
+        }
+
+        foreach (var npc in npcs)
+        {
+            if (!Functions.InRange(UserLocation, npc.Location, Globals.DataRange))
+            {
+                Note($"talk: approach {npc.Name} {npc.Location.X},{npc.Location.Y} from {UserLocation.X},{UserLocation.Y}");
+                WalkToward(npc.Location, 14);
+            }
+            if (!Functions.InRange(UserLocation, npc.Location, Globals.DataRange))
+            {
+                Chat($"@MOVE {npc.Location.X} {npc.Location.Y}");
+                Pump(700);
+            }
+
+            NpcName = npc.Name;
+            NpcObjectId = npc.ObjectID;
+            NpcCallSent++;
+            Send(new C.CallNPC { ObjectID = npc.ObjectID, Key = "[@Main]" });
+            Note($"input Talk CallNPC id={npc.ObjectID} name={npc.Name} key=[@Main] #{InputTalks}");
+            Pump(1000);
+            if (!NpcTalkOk)
+                continue;
+
+            TryBuyKeyFromDialog(npc.ObjectID);
+            return;
+        }
+
+        if (!NpcTalkOk && _defaultNpcId != 0)
+        {
+            NpcCallSent++;
+            NpcName ??= "DefaultNPC";
+            NpcObjectId = _defaultNpcId;
+            Send(new C.CallNPC { ObjectID = _defaultNpcId, Key = "[@Main]" });
+            Note($"input Talk CallNPC DefaultNPC id={_defaultNpcId} key=[@Main]");
+            Pump(1000);
+        }
+
+        if (!NpcTalkOk)
+            Note("talk: no S.NPCResponse (script missing or out of range)");
+    }
+
+    List<WorldObject> NpcsByDistance()
+    {
+        return _objects.Values
+            .Where(o => o.Kind == "npc")
+            .OrderBy(o => BoardScore(o.Name))
+            .ThenBy(o => Chebyshev(UserLocation, o.Location))
+            .ToList();
+    }
+
+    static int BoardScore(string name)
+    {
+        string n = name ?? "";
+        if (n.Contains("Jane", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("Helper", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("Grocery", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("Pedlar", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("Peddlar", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("Gilbert", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("Transport", StringComparison.OrdinalIgnoreCase))
+            return 0;
+        if (n.Contains("Board", StringComparison.OrdinalIgnoreCase))
+            return 2;
+        return 1;
+    }
+
+    static int Chebyshev(Point a, Point b)
+        => Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
+
+    void TryBuyKeyFromDialog(uint npcId)
+    {
+        string? key = null;
+        foreach (string line in NpcDialogLines)
+        {
+            string u = line.ToUpperInvariant();
+            if (u.Contains("@BUYSELL")) { key = "[@BUYSELL]"; break; }
+            if (u.Contains("@BUY") && key == null) key = "[@BUY]";
+        }
+        if (key == null) return;
+        Send(new C.CallNPC { ObjectID = npcId, Key = key });
+        Note($"input Talk CallNPC buy-key {key} id={npcId}");
+        Pump(800);
     }
 
     public void Send(Packet packet)
@@ -385,7 +494,13 @@ internal sealed class CrystalSession : IDisposable
                 break;
             case S.ObjectNPC npc:
                 Upsert(npc.ObjectID, npc.Name, npc.Location, "npc", "CArmour/00.Lib", 0);
-                Note($"ObjectNPC id={npc.ObjectID} name={npc.Name} loc={npc.Location.X},{npc.Location.Y}");
+                if (_objects.TryGetValue(npc.ObjectID, out var npcObj))
+                {
+                    npcObj.QuestIDs.Clear();
+                    if (npc.QuestIDs != null)
+                        npcObj.QuestIDs.AddRange(npc.QuestIDs);
+                }
+                Note($"ObjectNPC id={npc.ObjectID} name={npc.Name} loc={npc.Location.X},{npc.Location.Y} quests={npc.QuestIDs?.Count ?? 0}");
                 break;
             case S.ObjectItem item:
                 Upsert(item.ObjectID, item.Name, item.Location, "item", "CArmour/00.Lib", 0);
@@ -492,6 +607,42 @@ internal sealed class CrystalSession : IDisposable
                     && chat.Message.Contains(_lastSentChat, StringComparison.OrdinalIgnoreCase))
                     ChatEcho = true;
                 Note($"Chat recv [{chat.Type}] {chat.Message} echo={ChatEcho}");
+                break;
+            case S.NPCResponse page:
+                NpcTalkOk = true;
+                NpcDialogLines.Clear();
+                if (page.Page != null)
+                    NpcDialogLines.AddRange(page.Page.Where(l => !string.IsNullOrWhiteSpace(l)));
+                Note($"NPCResponse lines={NpcDialogLines.Count} npc={NpcName} id={NpcObjectId}");
+                foreach (string line in NpcDialogLines.Take(8))
+                    Note($"  npc-say {line}");
+                break;
+            case S.NPCGoods goods:
+                NpcGoods.Clear();
+                if (goods.List != null)
+                {
+                    foreach (var it in goods.List)
+                    {
+                        if (it == null) continue;
+                        NpcGoods.Add(ItemName(it));
+                    }
+                }
+                Note($"NPCGoods count={NpcGoods.Count} rate={goods.Rate} type={goods.Type}");
+                foreach (string name in NpcGoods.Take(8))
+                    Note($"  npc-goods {name}");
+                break;
+            case S.DefaultNPC def:
+                _defaultNpcId = def.ObjectID;
+                Note($"DefaultNPC id={def.ObjectID}");
+                break;
+            case S.NPCUpdate nup:
+                NpcObjectId = nup.NPCID;
+                Note($"NPCUpdate id={nup.NPCID}");
+                break;
+            case S.NewQuestInfo nq when nq.Info != null:
+                if (QuestNames.Count < 12 && !string.IsNullOrWhiteSpace(nq.Info.Name))
+                    QuestNames.Add(nq.Info.Name);
+                Note($"NewQuestInfo {nq.Info.Index} {nq.Info.Name}");
                 break;
             case S.NewMagic nm when nm.Magic != null && !nm.Hero:
                 _magics.Add(nm.Magic);

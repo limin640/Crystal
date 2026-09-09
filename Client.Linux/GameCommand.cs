@@ -7,7 +7,8 @@ internal enum GameCommandKind
     Walk,
     Attack,
     PickUp,
-    Chat
+    Chat,
+    Talk
 }
 
 internal readonly struct GameCommand
@@ -20,4 +21,5 @@ internal readonly struct GameCommand
     public static GameCommand Attack(MirDirection d) => new() { Kind = GameCommandKind.Attack, Direction = d, Text = "" };
     public static GameCommand PickUp() => new() { Kind = GameCommandKind.PickUp, Text = "" };
     public static GameCommand Chat(string text) => new() { Kind = GameCommandKind.Chat, Text = text };
+    public static GameCommand Talk() => new() { Kind = GameCommandKind.Talk, Text = "" };
 }

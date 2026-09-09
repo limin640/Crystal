@@ -252,4 +252,5 @@ internal sealed class WorldObject
     public string Kind = "";
     public string SpriteLibrary = "CArmour/00.Lib";
     public int SpriteIndex;
+    public List<int> QuestIDs { get; } = new();
 }

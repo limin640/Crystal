@@ -24,6 +24,7 @@ internal sealed class SceneHud : IDisposable
     public int ChatDraws { get; private set; }
     public int MiniMapDraws { get; private set; }
     public int MiniMapBlips { get; private set; }
+    public int NpcDraws { get; private set; }
     public int BagFilled { get; private set; }
     public int EquipFilled { get; private set; }
     public int BeltFilled { get; private set; }
@@ -65,6 +66,7 @@ internal sealed class SceneHud : IDisposable
         DrawBeltBar(width / 2 - 140, height - 118, session);
         DrawSkillBar(16, height - 118, session);
         DrawChatLog(16, height - 176, session);
+        DrawNpcPanel(270, 56, session);
 
         int barW = Math.Min(220, width / 3);
         int hp = session.UserHP;
@@ -91,7 +93,8 @@ internal sealed class SceneHud : IDisposable
         Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
         Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex} (geometry only)");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
-        Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} minimap={MiniMapDraws} total={HudDraws}");
+        Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count}");
+        Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} minimap={MiniMapDraws} npc={NpcDraws} total={HudDraws}");
         for (int i = 0; i < session.InventorySlots.Count; i++)
         {
             var it = session.InventorySlots[i];
@@ -109,12 +112,52 @@ internal sealed class SceneHud : IDisposable
             Console.WriteLine($"  hud-skill {mag.Name} spell={mag.Spell} lv={mag.Level} key={mag.Key}");
         foreach (string line in session.ChatLines)
             Console.WriteLine($"  hud-chat {line}");
+        if (!string.IsNullOrWhiteSpace(session.NpcName))
+            Console.WriteLine($"  hud-npc name={session.NpcName}");
+        foreach (string line in session.NpcDialogLines.Take(8))
+            Console.WriteLine($"  hud-npc-say {line}");
+        foreach (string g in session.NpcGoods.Take(8))
+            Console.WriteLine($"  hud-npc-goods {g}");
+        foreach (string q in session.QuestNames.Take(8))
+            Console.WriteLine($"  hud-quest {q}");
     }
 
     void ResetCounts()
     {
-        HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = MiniMapDraws = 0;
+        HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = MiniMapDraws = NpcDraws = 0;
         MiniMapBlips = BagFilled = EquipFilled = BeltFilled = SkillsFilled = 0;
+    }
+
+    void DrawNpcPanel(int x, int y, CrystalSession session)
+    {
+        int before = HudDraws;
+        Fill(x, y, 260, 200, Color.FromArgb(190, 16, 14, 20));
+        Text(x + 6, y + 2, "NPC", Color.Plum);
+        if (!string.IsNullOrWhiteSpace(session.NpcName))
+            Text(x + 40, y + 2, Clip(session.NpcName, 18), Color.White);
+        else
+            Text(x + 40, y + 2, session.NpcTalkOk ? "TALK" : "NONE", Color.Gray);
+        int row = y + 18;
+        foreach (string line in session.NpcDialogLines.Take(6))
+        {
+            Text(x + 6, row, Clip(line, 30), Color.Thistle);
+            row += 14;
+        }
+        if (session.NpcGoods.Count > 0)
+        {
+            Text(x + 6, row, "GOODS", Color.Khaki);
+            row += 14;
+            foreach (string g in session.NpcGoods.Take(3))
+            {
+                Text(x + 6, row, Clip(g, 28), Color.Wheat);
+                row += 14;
+            }
+        }
+        if (session.QuestNames.Count > 0)
+        {
+            Text(x + 6, Math.Min(row, y + 170), $"QUEST {session.QuestNames.Count}", Color.LightGreen);
+        }
+        NpcDraws = HudDraws - before;
     }
 
     void DrawMiniMap(int x, int y, int size, CrystalSession session, MapView? mapView)

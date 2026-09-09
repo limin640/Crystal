@@ -50,6 +50,14 @@ internal static class InputMap
             return true;
         }
 
+        if (t.Equals("Talk", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("NPC", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("Npc", StringComparison.OrdinalIgnoreCase))
+        {
+            command = GameCommand.Talk();
+            return true;
+        }
+
         if (t.Equals("PickUp", StringComparison.OrdinalIgnoreCase)
             || t.Equals("Pickup", StringComparison.OrdinalIgnoreCase)
             || t.Equals("G", StringComparison.OrdinalIgnoreCase)

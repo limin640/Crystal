@@ -193,7 +193,11 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Skill bar | **In progress** — 8 stubs from `ClientMagic` (no MagIcon WIL, no targeting) |
 | Chat log + send | **In progress** — last 4 lines; `--input-script Chat:hello` / windowed Enter compose → `C.Chat` |
 | Mini-map chrome | **In progress** — IRenderer geometry + player blip from map size / `MapCell` occupancy (`MMap.Lib` not loaded) |
-| `MirMessageBox`, NPC/quest/trade windows | Stub — deferred |
+| NPC talk (`C.CallNPC` `[@Main]` / `S.NPCResponse`) | **In progress** — IRenderer name + dialog lines |
+| NPC goods (`S.NPCGoods`) | **In progress** if the server sends it after `[@BUY]`/`[@BUYSELL]`; `C.BuyItem`/`C.SellItem` UI deferred |
+| Quest panel | **In progress** only as names from `S.NewQuestInfo` if they arrive; no accept/turn-in UI |
+| Player trade (`TradeRequest`/`TradeItem`/`TradeGold`) | Stub — deferred |
+| Inventory drag-drop | Stub — deferred |
 | Magic targeting / skill icons (`MagIcon`) | Stub |
 | Inventory drag-drop / use-item clicks | Stub (`C.EquipItem` still works) |
 | Mini-map WIL (`MMap.Lib`) / big map | Stub — no invented map art |
@@ -205,7 +209,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 ```bash
 # headless multi-step input after StartGame (does not replace the hard-gate --connect path)
 dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
-  --connect --headless --input-script Right,Chat:hello,Attack,Down,Attack \
+  --connect --headless --input-script Right,Talk,Attack \
   --catalog Tools/Crystal.Bake/fixtures/bake-out/catalog.json \
   --maps /path/to/Crystal.Database/Jev/Maps
 
@@ -303,7 +307,7 @@ Skill stubs drew (`skill=30`) with `skills=0` — Warrior has no `ClientMagic` y
 ## Remaining gaps (OK to defer)
 
 1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
-2. **Audio / WebView2 / NPC / quest / trade / drag-drop** — documented stubs; not a Linux verb blocker.
+2. **Audio / WebView2 / player-trade / drag-drop** — documented stubs; not a Linux verb blocker. NPC talk is in progress (`CallNPC`/`NPCResponse`). `C.BuyItem`/`C.SellItem` and quest accept stay stubbed.
 3. **Operator art** — floor/objects still catalog or `--data` `.Lib`; 86 catalog slots remain missing-on-disk. No invented WIL.
 4. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 
