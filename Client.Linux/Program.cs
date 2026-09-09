@@ -46,7 +46,7 @@ internal static class Program
             if (catalog == null)
             {
                 var probe = renderer.CreateSolidTexture(8, 8, Color.CornflowerBlue);
-                renderer.DrawQuad(probe, new Rectangle(0, 0, 8, 8), 16, 16, 64, 64, Color.White);
+                renderer.DrawQuad(probe, new System.Drawing.Rectangle(0, 0, 8, 8), 16, 16, 64, 64, Color.White);
             }
             else
             {
@@ -80,55 +80,55 @@ internal static class Program
             return 4;
         }
 
-        var options = WindowOptions.Default with
-        {
-            Size = new Vector2D<int>(width, height),
-            Title = "Crystal Client (Linux / OpenGL)"
-        };
-
-        using var window = Window.Create(options);
-        IRenderer? renderer = null;
-        GL? gl = null;
-        CatalogGpu? catalog = null;
-        int frameCount = 0;
-
-        window.Load += () =>
-        {
-            gl = window.CreateOpenGL();
-            renderer = RendererFactory.CreateOpenGL(gl, window.Size.X, window.Size.Y);
-            if (catalogPath != null && File.Exists(catalogPath))
-                catalog = LoadCatalogInto(renderer, catalogPath);
-        };
-
-        window.Render += _ =>
-        {
-            if (renderer == null) return;
-            renderer.BeginFrame(window.Size.X, window.Size.Y);
-            renderer.Clear(Color.FromArgb(255, 16, 16, 24));
-            if (catalog != null)
-                DrawCatalog(renderer, catalog, window.Size.X, window.Size.Y);
-            else
-            {
-                var tex = renderer.CreateSolidTexture(2, 2, Color.MediumPurple);
-                renderer.DrawQuad(tex, null, 32, 32, 128, 128, Color.MediumPurple);
-                tex.Dispose();
-            }
-            renderer.EndFrame();
-
-            frameCount++;
-            if (frames is int max && max > 0 && frameCount >= max)
-                window.Close();
-        };
-
-        window.Closing += () =>
-        {
-            catalog?.Dispose();
-            renderer?.Dispose();
-            gl?.Dispose();
-        };
-
         try
         {
+            var options = WindowOptions.Default with
+            {
+                Size = new Vector2D<int>(width, height),
+                Title = "Crystal Client (Linux / OpenGL)"
+            };
+
+            using var window = Window.Create(options);
+            IRenderer? renderer = null;
+            GL? gl = null;
+            CatalogGpu? catalog = null;
+            int frameCount = 0;
+
+            window.Load += () =>
+            {
+                gl = window.CreateOpenGL();
+                renderer = RendererFactory.CreateOpenGL(gl, window.Size.X, window.Size.Y);
+                if (catalogPath != null && File.Exists(catalogPath))
+                    catalog = LoadCatalogInto(renderer, catalogPath);
+            };
+
+            window.Render += _ =>
+            {
+                if (renderer == null) return;
+                renderer.BeginFrame(window.Size.X, window.Size.Y);
+                renderer.Clear(Color.FromArgb(255, 16, 16, 24));
+                if (catalog != null)
+                    DrawCatalog(renderer, catalog, window.Size.X, window.Size.Y);
+                else
+                {
+                    var tex = renderer.CreateSolidTexture(2, 2, Color.MediumPurple);
+                    renderer.DrawQuad(tex, null, 32, 32, 128, 128, Color.MediumPurple);
+                    tex.Dispose();
+                }
+                renderer.EndFrame();
+
+                frameCount++;
+                if (frames is int max && max > 0 && frameCount >= max)
+                    window.Close();
+            };
+
+            window.Closing += () =>
+            {
+                catalog?.Dispose();
+                renderer?.Dispose();
+                gl?.Dispose();
+            };
+
             window.Run();
             Console.WriteLine($"Client.Linux windowed OK frames={frameCount} backend={renderer?.BackendName}");
             return 0;
@@ -175,7 +175,7 @@ internal static class Program
             if (!catalog.Textures.TryGetValue(sprite.Atlas, out var tex))
                 continue;
 
-            var src = new Rectangle(sprite.X, sprite.Y, sprite.Width, sprite.Height);
+            var src = new System.Drawing.Rectangle(sprite.X, sprite.Y, sprite.Width, sprite.Height);
             float dw = Math.Clamp(sprite.Width, 4, 48);
             float dh = Math.Clamp(sprite.Height, 4, 48);
             renderer.DrawQuad(tex, src, x, y, dw, dh, Color.White);
