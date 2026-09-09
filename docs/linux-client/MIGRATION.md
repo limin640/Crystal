@@ -360,7 +360,7 @@ hud draws: … minimap=817 total=1246
 
 **Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `chats=0 ChatSent=0`, minimap still `700x700 draws=819`.
 
-`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest/mouse-drag chrome/audio/WebView2 stay deferred.
+`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest/mouse-drag chrome/WebView2 stay deferred.
 
 ### Inventory / equip HUD (2026-09-09, same VM)
 
@@ -416,6 +416,28 @@ FightHit=True LootOk=True EquipOk=True
 ```
 
 Mouse-drag chrome (SelectedCell ghost, WIL item icons, click-to-drop) stays deferred. `C.MergeItem` is wired (`Merge:from,to`) for stackables.
+
+### Linux audio — IAudio / OpenAL (2026-09-09, same VM)
+
+`Crystal.Audio` mirrors `IRenderer`: Null on `--headless` (no device), Silk.NET OpenAL on `--play-sound`. Windows `SoundManager` stays NAudio. No Sound pack on this VM; fixture `Tools/Crystal.Audio/fixtures/tone.wav` (generated sine, not game art). Operator packs: `--sound` / `CRYSTAL_SOUND`. OpenAL Soft uses the `null` output when no card (`alsoft-headless.conf` / `ALSOFT_DRIVERS=null`).
+
+**Play** `--headless --play-sound`: **EXIT:0**
+
+```
+SoundPlayOk=True backend=Silk.NET OpenAL file=Tools/Crystal.Audio/fixtures/tone.wav err=-
+```
+
+**Hard-gate** `--connect --headless` (no `--play-sound`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=60089 by self
+  loot  : PickUp ground (HP)DrugSmall
+  equip : EquipItem Success slot=Weapon name=WoodenSword
+sound: backend=Null (headless) SoundPlayOk=False skipped=headless
+```
+
+WebView2 stays Windows-only (no Linux stub). Mouse-drag chrome stays cosmetic deferred.
 
 ## Remaining gaps (OK to defer)
 

@@ -20,6 +20,7 @@ internal static class Program
 {
     static int Main(string[] args)
     {
+        Crystal.Audio.Backends.OpenALAudio.EnsureSoftNullDriver();
         bool headless = args.Any(a => a is "--headless" or "-h");
         bool connect = args.Contains("--connect");
         string? catalogPath = GetOption(args, "--catalog");

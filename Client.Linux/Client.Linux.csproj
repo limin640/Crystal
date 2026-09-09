@@ -28,6 +28,7 @@
     <None Update="Mir2Test.ini">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\Crystal.Audio\alsoft-headless.conf" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

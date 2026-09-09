@@ -13,4 +13,8 @@
     <PackageReference Include="Silk.NET.OpenAL" Version="2.22.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="alsoft-headless.conf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

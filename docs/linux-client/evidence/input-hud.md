@@ -184,6 +184,23 @@ hud-bag slot=7 name=(HP)DrugSmall x1
 
 Mouse-drag chrome (SelectedCell ghost, WIL icons, click-to-drop) stays deferred. `C.MergeItem` is wired (`Merge:from,to`).
 
+## Linux audio — IAudio / Silk.NET OpenAL (same VM, later)
+
+`--headless --play-sound` (fixture wav; no operator Sound pack on this VM). **EXIT:0**
+
+```
+SoundPlayOk=True backend=Silk.NET OpenAL file=Tools/Crystal.Audio/fixtures/tone.wav
+```
+
+**Hard-gate** `--connect --headless` (no `--play-sound`): **EXIT:0** — Null backend, no device.
+
+```
+sound: backend=Null (headless) SoundPlayOk=False skipped=headless
+FightHit=True LootOk=True EquipOk=True
+```
+
+Windows `SoundManager` stays NAudio. WebView2 is Windows-only (permanently deferred on Linux).
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). Audio (NAudio WASAPI/WaveOut — no Linux backend in this tree), WebView2 (WinForms Evergreen — no Linux runtime), mouse-drag chrome, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime), mouse-drag chrome, and `MMap.Lib` tiles stay deferred and do not block. Quest accept/turn-in stays stubbed. Do not vendor Sound packs; fixture wav is not game art.

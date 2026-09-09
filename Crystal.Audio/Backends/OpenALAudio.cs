@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Silk.NET.OpenAL;
 
 namespace Crystal.Audio.Backends;
@@ -23,9 +24,7 @@ public sealed class OpenALAudio : IAudio
             return false;
         }
 
-        // Soft can run without a speaker (null/pulse/alsa). Do not invent samples.
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ALSOFT_DRIVERS")))
-            Environment.SetEnvironmentVariable("ALSOFT_DRIVERS", "pulse,alsa,null");
+        EnsureSoftNullDriver();
 
         AL? al = null;
         ALContext? alc = null;
@@ -40,6 +39,8 @@ public sealed class OpenALAudio : IAudio
                 al = AL.GetApi(true);
                 alc = ALContext.GetApi(true);
                 device = alc.OpenDevice("");
+                if (device == null)
+                    device = alc.OpenDevice("OpenAL Soft");
                 if (device == null)
                 {
                     LastError = "alcOpenDevice failed (no OpenAL Soft device)";
@@ -128,4 +129,48 @@ public sealed class OpenALAudio : IAudio
     }
 
     public void Dispose() { }
+
+    /// <summary>
+    /// Soft reads drivers at native load. Point ALSOFT_CONF at a null-output
+    /// config when the operator has not chosen a driver (no speaker on CI).
+    /// </summary>
+    public static void EnsureSoftNullDriver()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ALSOFT_DRIVERS")))
+            SetProcessEnv("ALSOFT_DRIVERS", "null");
+
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ALSOFT_CONF")))
+        {
+            foreach (string probe in ConfCandidates())
+            {
+                if (!File.Exists(probe)) continue;
+                SetProcessEnv("ALSOFT_CONF", Path.GetFullPath(probe));
+                break;
+            }
+        }
+    }
+
+    // libopenal reads the libc environ, not only .NET's copy.
+    static void SetProcessEnv(string name, string value)
+    {
+        Environment.SetEnvironmentVariable(name, value);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            _ = setenv(name, value, 1);
+    }
+
+    [DllImport("libc", CallingConvention = CallingConvention.Cdecl)]
+    static extern int setenv(string name, string value, int overwrite);
+
+    static IEnumerable<string> ConfCandidates()
+    {
+        yield return Path.Combine(AppContext.BaseDirectory, "alsoft-headless.conf");
+        string? dir = AppContext.BaseDirectory;
+        for (int i = 0; i < 6 && dir != null; i++)
+        {
+            yield return Path.Combine(dir, "Crystal.Audio", "alsoft-headless.conf");
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+        yield return Path.Combine(Environment.CurrentDirectory, "Crystal.Audio", "alsoft-headless.conf");
+    }
 }
