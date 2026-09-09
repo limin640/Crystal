@@ -191,12 +191,13 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Inventory bag + equip slots | **In progress** — IRenderer panel from `UserInformation` / `GainedItem` / `EquipItem` |
 | Belt (inv 0–5) | **In progress** — IRenderer stub, Crystal `BeltDialog` slot map |
 | Skill bar | **In progress** — 8 stubs from `ClientMagic` (no MagIcon WIL, no targeting) |
-| Chat log | **In progress** — last 4 `S.Chat` lines (no input box) |
-| `MirMessageBox`, NPC/quest/trade windows | Stub |
+| Chat log + send | **In progress** — last 4 lines; `--input-script Chat:hello` / windowed Enter compose → `C.Chat` |
+| Mini-map chrome | **In progress** — IRenderer geometry + player blip from map size / `MapCell` occupancy (`MMap.Lib` not loaded) |
+| `MirMessageBox`, NPC/quest/trade windows | Stub — deferred |
 | Magic targeting / skill icons (`MagIcon`) | Stub |
 | Inventory drag-drop / use-item clicks | Stub (`C.EquipItem` still works) |
-| Mini-map (`MMap.Lib`) / big map | Stub |
-| Chat input box / CMain keybind INI | Stub |
+| Mini-map WIL (`MMap.Lib`) / big map | Stub — no invented map art |
+| CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
 | **Audio (NAudio)** | Deferred — do not block |
 | **WebView2** | Deferred — do not block |
@@ -204,7 +205,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 ```bash
 # headless multi-step input after StartGame (does not replace the hard-gate --connect path)
 dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
-  --connect --headless --input-script Right,Right,Attack,Down,Attack \
+  --connect --headless --input-script Right,Chat:hello,Attack,Down,Attack \
   --catalog Tools/Crystal.Bake/fixtures/bake-out/catalog.json \
   --maps /path/to/Crystal.Database/Jev/Maps
 
@@ -284,7 +285,7 @@ Skill stubs drew (`skill=30`) with `skills=0` — Warrior has no `ClientMagic` y
 ## Remaining gaps (OK to defer)
 
 1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
-2. **Audio / WebView2** — Windows-only; documented, not a Linux verb blocker.
+2. **Audio / WebView2 / NPC / quest / trade / drag-drop** — documented stubs; not a Linux verb blocker.
 3. **Operator art** — floor/objects still catalog or `--data` `.Lib`; 86 catalog slots remain missing-on-disk. No invented WIL.
 4. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 

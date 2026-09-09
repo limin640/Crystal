@@ -22,6 +22,8 @@ internal sealed class SceneHud : IDisposable
     public int BeltDraws { get; private set; }
     public int SkillDraws { get; private set; }
     public int ChatDraws { get; private set; }
+    public int MiniMapDraws { get; private set; }
+    public int MiniMapBlips { get; private set; }
     public int BagFilled { get; private set; }
     public int EquipFilled { get; private set; }
     public int BeltFilled { get; private set; }
@@ -51,14 +53,15 @@ internal sealed class SceneHud : IDisposable
         Text(16, height - 28, "WinForms dialogs stubbed — see MIGRATION.md", Color.DimGray);
     }
 
-    public void DrawGame(int width, int height, CrystalSession session)
+    public void DrawGame(int width, int height, CrystalSession session, MapView? mapView = null)
     {
         ResetCounts();
         Fill(8, 8, width - 16, 40, Color.FromArgb(190, 8, 10, 16));
         Text(16, 14, $"{session.MapTitle ?? "?"}  {session.UserName} Lv{session.UserLevel} {session.UserClass}  {session.UserLocation.X},{session.UserLocation.Y}  {session.Facing}  G{session.UserGold}", Color.White);
 
         DrawEquipPanel(16, 56, session);
-        DrawInventoryPanel(width - 292, 56, session);
+        DrawInventoryPanel(width - 292, 188, session);
+        DrawMiniMap(width - 140, 52, 128, session, mapView);
         DrawBeltBar(width / 2 - 140, height - 118, session);
         DrawSkillBar(16, height - 118, session);
         DrawChatLog(16, height - 176, session);
@@ -78,13 +81,17 @@ internal sealed class SceneHud : IDisposable
             Fill(16, height - 32, (int)(barW * (mp / (float)mpMax)), 12, Color.FromArgb(255, 48, 96, 200));
         Text(16 + barW + 8, height - 34, $"MP {mp}/{mpMax}", Color.LightSteelBlue);
 
-        Text(width - 220, height - 28, $"in {session.InputWalks} atk {session.InputAttacks}", Color.Silver);
+        Text(width - 220, height - 28, $"in {session.InputWalks} atk {session.InputAttacks} say {session.InputChats}", Color.Silver);
+        if (session.ChatComposing)
+            Text(16, height - 72, $"> {session.ChatDraft}_", Color.Yellow);
     }
 
     public void WriteEvidence(CrystalSession session)
     {
         Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
-        Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} total={HudDraws}");
+        Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex} (geometry only)");
+        Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
+        Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} minimap={MiniMapDraws} total={HudDraws}");
         for (int i = 0; i < session.InventorySlots.Count; i++)
         {
             var it = session.InventorySlots[i];
@@ -106,8 +113,72 @@ internal sealed class SceneHud : IDisposable
 
     void ResetCounts()
     {
-        HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = 0;
-        BagFilled = EquipFilled = BeltFilled = SkillsFilled = 0;
+        HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = MiniMapDraws = 0;
+        MiniMapBlips = BagFilled = EquipFilled = BeltFilled = SkillsFilled = 0;
+    }
+
+    void DrawMiniMap(int x, int y, int size, CrystalSession session, MapView? mapView)
+    {
+        int before = HudDraws;
+        int mw = mapView is { MapLoaded: true } ? mapView.MapWidth : session.MapWidth;
+        int mh = mapView is { MapLoaded: true } ? mapView.MapHeight : session.MapHeight;
+        Fill(x, y, size, size, Color.FromArgb(220, 8, 12, 10));
+        Fill(x + 2, y + 14, size - 4, size - 16, Color.FromArgb(255, 12, 20, 14));
+        Text(x + 4, y + 2, "MAP", Color.PaleGreen);
+
+        if (mw > 0 && mh > 0)
+        {
+            int inner = size - 20;
+            int ox = x + 4;
+            int oy = y + 16;
+            var cells = mapView is { MapLoaded: true } ? mapView.Cells : null;
+            const int samples = 32;
+            float cw = inner / (float)samples;
+            float ch = inner / (float)samples;
+            for (int sy = 0; sy < samples; sy++)
+            {
+                int my = Math.Clamp(sy * mh / samples, 0, Math.Max(0, mh - 1));
+                for (int sx = 0; sx < samples; sx++)
+                {
+                    int mx = Math.Clamp(sx * mw / samples, 0, Math.Max(0, mw - 1));
+                    bool filled = false;
+                    if (cells != null && mx < cells.GetLength(0) && my < cells.GetLength(1))
+                    {
+                        var cell = cells[mx, my];
+                        filled = cell.BackImage != 0 && cell.BackIndex != -1;
+                    }
+                    if (filled)
+                        Fill(ox + (int)(sx * cw), oy + (int)(sy * ch), Math.Max(1, (int)cw), Math.Max(1, (int)ch), Color.FromArgb(180, 28, 48, 32));
+                }
+            }
+
+            void Blip(int cellX, int cellY, Color color, int w = 3)
+            {
+                int px = ox + (int)(cellX / (float)mw * inner) - w / 2;
+                int py = oy + (int)(cellY / (float)mh * inner) - w / 2;
+                Fill(px, py, w, w, color);
+                MiniMapBlips++;
+            }
+
+            foreach (var obj in session.Objects)
+            {
+                if (obj.ObjectID == session.UserObjectId) continue;
+                var color = obj.Kind switch
+                {
+                    "monster" => Color.FromArgb(255, 180, 48, 48),
+                    "npc" => Color.FromArgb(255, 80, 160, 220),
+                    "item" or "gold" => Color.Gold,
+                    _ => Color.Gray
+                };
+                Blip(obj.Location.X, obj.Location.Y, color, 2);
+            }
+            Blip(session.UserLocation.X, session.UserLocation.Y, Color.Yellow, 4);
+            Text(x + 4, y + size - 12, $"{mw}x{mh}", Color.DarkSeaGreen);
+        }
+        else
+            Text(x + 8, y + size / 2, "NO SIZE", Color.Gray);
+
+        MiniMapDraws = HudDraws - before;
     }
 
     void DrawEquipPanel(int x, int y, CrystalSession session)

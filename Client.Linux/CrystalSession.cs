@@ -86,6 +86,16 @@ internal sealed class CrystalSession : IDisposable
     public int InputWalks { get; private set; }
     public int InputAttacks { get; private set; }
     public int InputPickups { get; private set; }
+    public int InputChats { get; private set; }
+    public int ChatSent { get; private set; }
+    public int ChatRecv { get; private set; }
+    public bool ChatEcho { get; private set; }
+    public int MapWidth { get; private set; }
+    public int MapHeight { get; private set; }
+    public ushort MiniMapIndex { get; private set; }
+    public bool ChatComposing { get; private set; }
+    public string ChatDraft { get; private set; } = "";
+    string _lastSentChat = "";
     public const int BeltSlotCount = 6;
     public IReadOnlyList<UserItem?> InventorySlots => _inventory;
     public IReadOnlyList<UserItem?> EquipmentSlots => _equipment;
@@ -133,6 +143,9 @@ internal sealed class CrystalSession : IDisposable
                 Send(new C.PickUp());
                 Note($"input PickUp #{InputPickups}");
                 break;
+            case GameCommandKind.Chat:
+                SendChat(command.Text);
+                break;
         }
     }
 
@@ -154,8 +167,71 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} pickups={InputPickups} loc={UserLocation.X},{UserLocation.Y} WalkAck={WalkAck} FightHit={FightHit}");
-        return InputWalks > 0 && InputAttacks > 0 ? 0 : 10;
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} pickups={InputPickups} chats={InputChats} ChatSent={ChatSent} ChatRecv={ChatRecv} ChatEcho={ChatEcho} loc={UserLocation.X},{UserLocation.Y} WalkAck={WalkAck} FightHit={FightHit}");
+        bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
+        bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
+        bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
+        if (wantWalk && InputWalks == 0) return 10;
+        if (wantAtk && InputAttacks == 0) return 10;
+        if (wantChat && ChatSent == 0) return 10;
+        return 0;
+    }
+
+    public void NoteMapSize(int width, int height)
+    {
+        if (width > 0) MapWidth = width;
+        if (height > 0) MapHeight = height;
+        Note($"map size {MapWidth}x{MapHeight} (MapReader / known cells — no invented MMap art)");
+    }
+
+    public void BeginChat()
+    {
+        ChatComposing = true;
+        ChatDraft = "";
+    }
+
+    public void AppendChat(char ch)
+    {
+        if (!ChatComposing || char.IsControl(ch)) return;
+        if (ChatDraft.Length < 60)
+            ChatDraft += ch;
+    }
+
+    public void ChatBackspace()
+    {
+        if (!ChatComposing || ChatDraft.Length == 0) return;
+        ChatDraft = ChatDraft[..^1];
+    }
+
+    public void CancelChat()
+    {
+        ChatComposing = false;
+        ChatDraft = "";
+    }
+
+    public void CommitChat()
+    {
+        if (!ChatComposing) return;
+        string text = ChatDraft.Trim();
+        ChatComposing = false;
+        ChatDraft = "";
+        if (text.Length > 0)
+            SendChat(text);
+    }
+
+    void SendChat(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || !InMap || !SocketConnected)
+            return;
+        InputChats++;
+        ChatSent++;
+        _lastSentChat = text;
+        _chatLines.Add($"> {text}");
+        if (_chatLines.Count > 4)
+            _chatLines.RemoveAt(0);
+        LastChat = $"> {text}";
+        Send(new C.Chat { Message = text });
+        Note($"input Chat send '{text}' #{ChatSent}");
     }
 
     public void Send(Packet packet)
@@ -264,8 +340,9 @@ internal sealed class CrystalSession : IDisposable
                 MapIndex = map.MapIndex;
                 MapFileName = map.FileName;
                 MapTitle = map.Title;
+                MiniMapIndex = map.MiniMap;
                 InMap = true;
-                Note($"in-map: MapInformation index={map.MapIndex} file={map.FileName} title={map.Title} lights={map.Lights}");
+                Note($"in-map: MapInformation index={map.MapIndex} file={map.FileName} title={map.Title} lights={map.Lights} minimapLib={map.MiniMap} (MMap.Lib deferred — geometry chrome only)");
                 break;
             case S.UserInformation user:
                 UserObjectId = user.ObjectID;
@@ -406,11 +483,15 @@ internal sealed class CrystalSession : IDisposable
                 _objects.Remove(rem.ObjectID);
                 break;
             case S.Chat chat:
+                ChatRecv++;
                 LastChat = chat.Message;
                 _chatLines.Add(chat.Message);
                 if (_chatLines.Count > 4)
                     _chatLines.RemoveAt(0);
-                Note($"Chat [{chat.Type}] {chat.Message}");
+                if (ChatSent > 0 && _lastSentChat.Length > 0
+                    && chat.Message.Contains(_lastSentChat, StringComparison.OrdinalIgnoreCase))
+                    ChatEcho = true;
+                Note($"Chat recv [{chat.Type}] {chat.Message} echo={ChatEcho}");
                 break;
             case S.NewMagic nm when nm.Magic != null && !nm.Hero:
                 _magics.Add(nm.Magic);

@@ -154,7 +154,7 @@ internal static class Program
         }
         if (session != null)
         {
-            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups}");
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} ChatSent={session.ChatSent} ChatRecv={session.ChatRecv} ChatEcho={session.ChatEcho}");
             Console.WriteLine($"  items   : bag={session.BagCount} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
         }
         Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
@@ -191,6 +191,8 @@ internal static class Program
         if (!mapView.LoadMap(root, session.MapFileName))
             return false;
 
+        session.NoteMapSize(mapView.MapWidth, mapView.MapHeight);
+
         var objects = session.Objects.ToList();
         for (int f = 0; f < Math.Max(1, frames); f++)
         {
@@ -198,7 +200,7 @@ internal static class Program
             renderer.Clear(Color.FromArgb(255, 8, 12, 8));
             renderer.SetBlend(true, 1f, Crystal.Graphics.BlendMode.NORMAL);
             mapView.Draw(width, height, session.UserLocation, objects);
-            hud?.DrawGame(width, height, session);
+            hud?.DrawGame(width, height, session, mapView);
             renderer.EndFrame();
             renderer.Present();
         }
@@ -247,16 +249,36 @@ internal static class Program
                 if (catalog != null)
                     mapView = new MapView(renderer, catalog.Textures, catalog.Sprites, dataRoot);
                 if (mapView != null && session is { InMap: true } && !string.IsNullOrWhiteSpace(session.MapFileName) && !string.IsNullOrWhiteSpace(mapsRoot))
+                {
                     mapView.LoadMap(mapsRoot, session.MapFileName);
+                    session.NoteMapSize(mapView.MapWidth, mapView.MapHeight);
+                }
 
                 input = window.CreateInput();
                 foreach (var kb in input.Keyboards)
                 {
+                    kb.KeyChar += (_, ch) =>
+                    {
+                        if (session is { ChatComposing: true })
+                            session.AppendChat(ch);
+                    };
                     kb.KeyDown += (_, key, _) =>
                     {
                         held.Add(key);
                         if (session is not { InMap: true }) return;
-                        if (key is Key.Space or Key.ControlLeft or Key.Z)
+                        if (session.ChatComposing)
+                        {
+                            if (key is Key.Enter or Key.KeypadEnter)
+                                session.CommitChat();
+                            else if (key is Key.Escape)
+                                session.CancelChat();
+                            else if (key is Key.Backspace)
+                                session.ChatBackspace();
+                            return;
+                        }
+                        if (key is Key.Enter or Key.KeypadEnter)
+                            session.BeginChat();
+                        else if (key is Key.Space or Key.ControlLeft or Key.Z)
                             session.Drive(GameCommand.Attack(session.Facing));
                         else if (key is Key.G or Key.F)
                             session.Drive(GameCommand.PickUp());
@@ -291,6 +313,7 @@ internal static class Program
             {
                 session?.Pump(0);
                 if (session is not { InMap: true }) return;
+                if (session.ChatComposing) return;
                 if (DateTime.UtcNow < nextHeld) return;
                 foreach (var key in held)
                 {
@@ -320,7 +343,7 @@ internal static class Program
                 }
                 if (hud != null && session != null)
                 {
-                    if (session.InMap) hud.DrawGame(window.Size.X, window.Size.Y, session);
+                    if (session.InMap) hud.DrawGame(window.Size.X, window.Size.Y, session, mapView);
                     else if (session.LoginSuccess) hud.DrawSelect(window.Size.X, window.Size.Y, session);
                 }
                 renderer.EndFrame();

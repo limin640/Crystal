@@ -12,7 +12,8 @@ internal static class InputMap
     public static List<GameCommand> ParseScript(string script)
     {
         var list = new List<GameCommand>();
-        foreach (string raw in script.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+        // Comma/semicolon only so Chat:hello_world stays one token.
+        foreach (string raw in script.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
         {
             if (TryParseToken(raw.Trim(), out var cmd))
                 list.Add(cmd);
@@ -27,6 +28,17 @@ internal static class InputMap
         command = default;
         string t = token.Trim();
         if (t.Length == 0) return false;
+
+        if (t.StartsWith("Chat:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Say:", StringComparison.OrdinalIgnoreCase))
+        {
+            int colon = t.IndexOf(':');
+            string msg = colon >= 0 && colon + 1 < t.Length ? t[(colon + 1)..].Trim() : "";
+            msg = msg.Replace('_', ' ');
+            if (msg.Length == 0) return false;
+            command = GameCommand.Chat(msg);
+            return true;
+        }
 
         if (t.Equals("Attack", StringComparison.OrdinalIgnoreCase)
             || t.Equals("Hit", StringComparison.OrdinalIgnoreCase)

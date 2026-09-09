@@ -147,7 +147,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |
 | `--no-gate` | Stop after walk (skip scripted Attack / PickUp / EquipItem) |
-| `--input-script` | After StartGame, inject Crystal walk/attack keys (`Right,Right,Attack`) — same path as Silk.NET input |
+| `--input-script` | After StartGame, inject Crystal keys (`Right,Chat:hello,Attack`) — same `Drive()` as Silk.NET; `Chat:` sends Shared `C.Chat` |
 | `--input-step-ms` | Delay between injected commands (default 400) |
 | `--window` | Silk.NET OpenGL + keyboard/mouse after `--connect` (inventory/equip HUD on IRenderer) |
 | `--enter-wait-ms` | How long to wait for `MapInformation` / `UserInformation` |
