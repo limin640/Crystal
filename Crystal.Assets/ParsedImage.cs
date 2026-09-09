@@ -17,8 +17,22 @@ public sealed class ParsedImage
     public bool HasMask { get; init; }
     public bool IsBlank { get; init; }
 
-    /// <summary>BGRA8888 pixels, length = Width * Height * 4. Null if header parsed but pixels were not decoded.</summary>
-    public byte[]? Bgra { get; init; }
+    /// <summary>BGRA8888 pixels, length = Width * Height * 4. Null if header parsed but pixels were not decoded, or after <see cref="ReleasePixels"/>.</summary>
+    public byte[]? Bgra { get; set; }
 
-    public bool Decoded => Bgra is { Length: > 0 };
+    bool _decoded;
+
+    /// <summary>True once pixels were decoded, even after they are released to keep a large Data tree streaming.</summary>
+    public bool Decoded
+    {
+        get => _decoded || Bgra is { Length: > 0 };
+        set => _decoded = value;
+    }
+
+    public void ReleasePixels()
+    {
+        if (Bgra is { Length: > 0 })
+            _decoded = true;
+        Bgra = null;
+    }
 }

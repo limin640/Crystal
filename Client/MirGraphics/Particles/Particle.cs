@@ -1,7 +1,7 @@
 ﻿using Client.MirObjects;
 using Client.MirScenes;
-using SlimDX;
 using System;
+using System.Numerics;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;

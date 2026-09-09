@@ -38,10 +38,15 @@ public interface IRenderer : IDisposable
     IGpuTexture CreateTexture(int width, int height, ReadOnlySpan<byte> bgra);
     IGpuTexture CreateRenderTarget(int width, int height);
     IGpuTexture CreateSolidTexture(int width, int height, Color color);
+    void UpdateTexture(IGpuTexture texture, ReadOnlySpan<byte> bgra);
+    IGpuSurface GetSurface(IGpuTexture texture);
 
     void DrawQuad(IGpuTexture texture, Rectangle? source, float destX, float destY, float destW, float destH, Color color, float opacity = 1f);
 
     void DrawLine(ReadOnlySpan<PointF> points, Color color, float width = 1f);
+
+    /// <summary>Light overlay: dest *= source (D3D Zero / SourceColor).</summary>
+    void SetMultiplyBlend();
 }
 
 /// <summary>Mirrors Shared.BlendMode so Crystal.Graphics stays free of the Shared WinForms graph.</summary>

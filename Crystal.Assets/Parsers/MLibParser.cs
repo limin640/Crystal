@@ -8,7 +8,7 @@ namespace Crystal.Assets.Parsers;
 /// </summary>
 public static class MLibParser
 {
-    public static LibraryParseResult Parse(DiscoveredLibrary library)
+    public static LibraryParseResult Parse(DiscoveredLibrary library, Action<ParsedImage>? onImage = null)
     {
         using var stream = File.OpenRead(library.Path);
         using var reader = new BinaryReader(stream);
@@ -21,12 +21,12 @@ public static class MLibParser
         // Client MLibrary v2/v3 starts with version (>= 2). V0 starts with Count.
         bool looksLikeVersioned = first >= 2 && first <= 8;
         if (looksLikeVersioned)
-            return ParseVersioned(library, reader, first);
+            return ParseVersioned(library, reader, first, onImage);
 
-        return ParseV0(library, reader, first);
+        return ParseV0(library, reader, first, onImage);
     }
 
-    static LibraryParseResult ParseVersioned(DiscoveredLibrary library, BinaryReader reader, int version)
+    static LibraryParseResult ParseVersioned(DiscoveredLibrary library, BinaryReader reader, int version, Action<ParsedImage>? onImage)
     {
         if (version < 2)
             return LibraryParser.Failed(library, $"Unsupported Lib version {version}");
@@ -51,7 +51,9 @@ public static class MLibParser
             int offset = indices[i];
             if (offset <= 0 || offset + 17 > stream.Length)
             {
-                images.Add(new ParsedImage { Index = i, IsBlank = true });
+                var blank = new ParsedImage { Index = i, IsBlank = true };
+                images.Add(blank);
+                onImage?.Invoke(blank);
                 continue;
             }
 
@@ -68,11 +70,13 @@ public static class MLibParser
 
             if (width <= 0 || height <= 0 || length <= 0)
             {
-                images.Add(new ParsedImage
+                var blank = new ParsedImage
                 {
                     Index = i, Width = width, Height = height, OffsetX = x, OffsetY = y,
                     ShadowX = sx, ShadowY = sy, Shadow = shadow, HasMask = hasMask, IsBlank = true
-                });
+                };
+                images.Add(blank);
+                onImage?.Invoke(blank);
                 continue;
             }
 
@@ -92,7 +96,7 @@ public static class MLibParser
                 bgra = null;
             }
 
-            images.Add(new ParsedImage
+            var image = new ParsedImage
             {
                 Index = i,
                 Width = width,
@@ -104,8 +108,11 @@ public static class MLibParser
                 Shadow = shadow,
                 HasMask = hasMask,
                 IsBlank = false,
-                Bgra = bgra
-            });
+                Bgra = bgra,
+                Decoded = bgra is { Length: > 0 }
+            };
+            images.Add(image);
+            onImage?.Invoke(image);
         }
 
         return new LibraryParseResult
@@ -120,7 +127,7 @@ public static class MLibParser
         };
     }
 
-    static LibraryParseResult ParseV0(DiscoveredLibrary library, BinaryReader reader, int count)
+    static LibraryParseResult ParseV0(DiscoveredLibrary library, BinaryReader reader, int count, Action<ParsedImage>? onImage)
     {
         if (count < 0 || count > 2_000_000)
             return LibraryParser.Failed(library, $"Implausible V0 image count {count}");
@@ -139,7 +146,9 @@ public static class MLibParser
             int offset = indices[i];
             if (offset <= 0 || offset + 16 > reader.BaseStream.Length)
             {
-                images.Add(new ParsedImage { Index = i, IsBlank = true });
+                var blank = new ParsedImage { Index = i, IsBlank = true };
+                images.Add(blank);
+                onImage?.Invoke(blank);
                 continue;
             }
 
@@ -148,7 +157,7 @@ public static class MLibParser
             short height = reader.ReadInt16();
             short x = reader.ReadInt16();
             short y = reader.ReadInt16();
-            images.Add(new ParsedImage
+            var image = new ParsedImage
             {
                 Index = i,
                 Width = width,
@@ -156,7 +165,9 @@ public static class MLibParser
                 OffsetX = x,
                 OffsetY = y,
                 IsBlank = width <= 0 || height <= 0
-            });
+            };
+            images.Add(image);
+            onImage?.Invoke(image);
         }
 
         return new LibraryParseResult

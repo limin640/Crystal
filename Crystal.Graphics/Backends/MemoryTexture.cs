@@ -6,7 +6,9 @@ internal sealed class MemoryTexture : IGpuTexture
     public int Height { get; }
     public bool IsRenderTarget { get; }
     public bool IsDisposed { get; private set; }
-    public byte[] Bgra { get; }
+    public bool Disposed => IsDisposed;
+    public byte[] Bgra { get; set; }
+    MemorySurface? _surface;
 
     public MemoryTexture(int width, int height, byte[] bgra, bool renderTarget = false)
     {
@@ -16,6 +18,8 @@ internal sealed class MemoryTexture : IGpuTexture
         IsRenderTarget = renderTarget;
     }
 
+    public IGpuSurface GetSurface() => _surface ??= new MemorySurface(Width, Height, this);
+
     public void Dispose() => IsDisposed = true;
 }
 
@@ -24,6 +28,7 @@ internal sealed class MemorySurface : IGpuSurface
     public int Width { get; }
     public int Height { get; }
     public bool IsDisposed { get; private set; }
+    public bool Disposed => IsDisposed;
     public IGpuTexture? Texture { get; }
 
     public MemorySurface(int width, int height, IGpuTexture? texture)
@@ -33,5 +38,5 @@ internal sealed class MemorySurface : IGpuSurface
         Texture = texture;
     }
 
-    public void Dispose() => IsDisposed = true;
+    public void Dispose() { }
 }

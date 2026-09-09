@@ -20,7 +20,8 @@ public static class SampleDataWriter
         WriteLib(Path.Combine(dataRoot, "CArmour", "00.Lib"), 1, 24);
         WriteWil(Path.Combine(dataRoot, "Extra", "sample.Wil"), 2, 8);
         WriteWzl(Path.Combine(dataRoot, "Extra", "sample.Wzl"), 1, 8);
-        WriteWtl(Path.Combine(dataRoot, "Extra", "sample.Wtl"), 2, 16);
+        WriteWtlV1(Path.Combine(dataRoot, "Extra", "sample.Wtl"), 2, 4);
+        WriteWtlV2(Path.Combine(dataRoot, "Extra", "dxt-v2.Wtl"), 1, 4);
 
         Directory.CreateDirectory(Path.Combine(dataRoot, "Extra"));
         File.WriteAllBytes(Path.Combine(dataRoot, "Extra", "broken.Lib"), new byte[] { 1, 0, 0, 0 });
@@ -145,18 +146,39 @@ public static class SampleDataWriter
             iw.Write(o);
     }
 
-    static void WriteWtl(string path, int count, int size)
+    /// <summary>
+    /// Writes every Crystal catalog slot as a 1-image 4×4 .Lib. Synthetic stress tree only —
+    /// do not vendor a real client pack. Intended for /tmp, not git.
+    /// </summary>
+    public static string WriteStress(string dataRoot)
+    {
+        Directory.CreateDirectory(dataRoot);
+        foreach (string relative in CrystalCatalog.ExpectedRelativePaths())
+            WriteLib(Path.Combine(dataRoot, relative.Replace('/', Path.DirectorySeparatorChar)), 1, 4);
+
+        for (int i = 0; i < 32; i++)
+            WriteLib(Path.Combine(dataRoot, "Monster", $"{i:D3}.Lib"), 1, 4);
+        for (int i = 0; i < 8; i++)
+            WriteLib(Path.Combine(dataRoot, "CArmour", $"{i:D2}.Lib"), 1, 4);
+
+        return dataRoot;
+    }
+
+    static void WriteWtlV1(string path, int count, int size)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        var indexOffset = 32 + count * 4;
+        byte[] payload = EncodeWtlV1Payload(size);
+        int imageBytes = 16 + payload.Length;
+        int indexOffset = 32 + count * 4;
+
         using var file = File.Create(path);
         using var w = new BinaryWriter(file);
         w.Write((short)0);
         var ver = new byte[20];
         System.Text.Encoding.ASCII.GetBytes("ILIB v1.0-SAMPLE").CopyTo(ver, 0);
         w.Write(ver);
-        w.Write(new byte[6]); // pad so count sits at offset 28, matching WTLLibrary
+        w.Write(new byte[6]);
         w.Write(count);
 
         int cursor = indexOffset;
@@ -164,7 +186,7 @@ public static class SampleDataWriter
         for (int i = 0; i < count; i++)
         {
             offsets[i] = cursor;
-            cursor += 16;
+            cursor += imageBytes;
         }
         foreach (int o in offsets)
             w.Write(o);
@@ -177,7 +199,89 @@ public static class SampleDataWriter
             w.Write((short)0);
             w.Write((short)0);
             w.Write((short)0);
+            int length = payload.Length;
+            w.Write((byte)(length & 0xFF));
+            w.Write((byte)((length >> 8) & 0xFF));
+            w.Write((byte)((length >> 16) & 0xFF));
+            w.Write((byte)0); // shadow
+            w.Write(payload);
         }
+    }
+
+    static void WriteWtlV2(string path, int count, int size)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        byte[] dxt = EncodeSolidDxt1((byte)(31), 0, 0);
+        byte[] zlib = DeflateZlib(dxt);
+        int padded = zlib.Length + (zlib.Length % 4 == 0 ? 0 : 4 - zlib.Length % 4);
+        int imageHeader = 12 + 4 + 4; // dims + types + length
+        int imageBytes = imageHeader + padded;
+        int indexBase = 32;
+
+        using var file = File.Create(path);
+        using var w = new BinaryWriter(file);
+        w.Write((short)0);
+        var ver = new byte[20];
+        System.Text.Encoding.ASCII.GetBytes("ILIB v2.0-WEMADE").CopyTo(ver, 0);
+        w.Write(ver);
+        w.Write(new byte[6]);
+        w.Write(count);
+
+        int cursor = indexBase;
+        var offsets = new int[count];
+        for (int i = 0; i < count; i++)
+        {
+            offsets[i] = cursor;
+            cursor += imageBytes;
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            w.Write((short)size);
+            w.Write((short)size);
+            w.Write((short)0);
+            w.Write((short)0);
+            w.Write((short)0);
+            w.Write((short)0);
+            w.Write((byte)0);
+            w.Write((byte)1); // DXT1
+            w.Write((byte)0);
+            w.Write((byte)0);
+            w.Write(zlib.Length);
+            w.Write(zlib);
+            for (int p = zlib.Length; p < padded; p++)
+                w.Write((byte)0);
+        }
+
+        foreach (int o in offsets)
+            w.Write(o);
+    }
+
+    static byte[] EncodeWtlV1Payload(int size)
+    {
+        // 8 count bytes (skip 0, write 1 block) + one 8-byte DXT-like block.
+        // Enough for a 4×4 image; larger sizes still prove the decoder path.
+        _ = size;
+        var payload = new byte[16];
+        payload[1] = 1;
+        byte[] block = EncodeSolidDxt1(31, 0, 0);
+        Buffer.BlockCopy(block, 0, payload, 8, 8);
+        return payload;
+    }
+
+    static byte[] EncodeSolidDxt1(byte r5, byte g6, byte b5)
+    {
+        ushort c0 = (ushort)((r5 << 11) | (g6 << 5) | b5);
+        ushort c1 = (ushort)((Math.Max(0, r5 - 8) << 11) | (g6 << 5) | b5);
+        if (c0 <= c1)
+            c0 = (ushort)(c1 + 1);
+        return new byte[]
+        {
+            (byte)(c0 & 0xFF), (byte)(c0 >> 8),
+            (byte)(c1 & 0xFF), (byte)(c1 >> 8),
+            0, 0, 0, 0
+        };
     }
 
     static byte[] SolidBgra(int w, int h, byte b, byte g, byte r, byte a)

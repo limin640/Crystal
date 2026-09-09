@@ -175,6 +175,27 @@ public sealed class OpenGLRenderer : IRenderer
         return CreateTexture(width, height, data);
     }
 
+    public void UpdateTexture(IGpuTexture texture, ReadOnlySpan<byte> bgra)
+    {
+        if (texture is not GlTexture gltex || gltex.IsDisposed)
+            return;
+        _gl.BindTexture(TextureTarget.Texture2D, gltex.Handle);
+        byte[] copy = bgra.ToArray();
+        unsafe
+        {
+            fixed (byte* p = copy)
+                _gl.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, (uint)gltex.Width, (uint)gltex.Height, PixelFormat.Bgra, PixelType.UnsignedByte, p);
+        }
+    }
+
+    public IGpuSurface GetSurface(IGpuTexture texture) => texture.GetSurface();
+
+    public void SetMultiplyBlend()
+    {
+        Flush();
+        _gl.BlendFunc(BlendingFactor.Zero, BlendingFactor.SrcColor);
+    }
+
     public void DrawQuad(IGpuTexture texture, Rectangle? source, float destX, float destY, float destW, float destH, Color color, float opacity = 1)
     {
         if (texture is not GlTexture gltex || gltex.IsDisposed)
@@ -377,6 +398,8 @@ sealed class GlTexture : IGpuTexture
     public int Height { get; }
     public bool IsRenderTarget { get; }
     public bool IsDisposed { get; private set; }
+    public bool Disposed => IsDisposed;
+    GlSurface? _surface;
 
     public GlTexture(GL gl, uint handle, int width, int height, bool rt)
     {
@@ -386,6 +409,8 @@ sealed class GlTexture : IGpuTexture
         Height = height;
         IsRenderTarget = rt;
     }
+
+    public IGpuSurface GetSurface() => _surface ??= new GlSurface(this, Framebuffer);
 
     public void Dispose()
     {
@@ -402,6 +427,7 @@ sealed class GlSurface : IGpuSurface
     public int Width { get; }
     public int Height { get; }
     public bool IsDisposed { get; private set; }
+    public bool Disposed => IsDisposed;
     public IGpuTexture? Texture { get; }
     public uint Framebuffer { get; }
 
@@ -413,5 +439,5 @@ sealed class GlSurface : IGpuSurface
         Framebuffer = framebuffer;
     }
 
-    public void Dispose() => IsDisposed = true;
+    public void Dispose() { }
 }

@@ -2,15 +2,15 @@ namespace Crystal.Assets.Parsers;
 
 public static class LibraryParser
 {
-    public static LibraryParseResult Parse(DiscoveredLibrary library)
+    public static LibraryParseResult Parse(DiscoveredLibrary library, Action<ParsedImage>? onImage = null)
     {
         try
         {
             return library.Kind switch
             {
-                LibraryKind.MLib => MLibParser.Parse(library),
-                LibraryKind.Wil or LibraryKind.Wzl or LibraryKind.Miz => WilWzlParser.Parse(library),
-                LibraryKind.Wtl => WtlParser.Parse(library),
+                LibraryKind.MLib => MLibParser.Parse(library, onImage),
+                LibraryKind.Wil or LibraryKind.Wzl or LibraryKind.Miz => WilWzlParser.Parse(library, onImage),
+                LibraryKind.Wtl => WtlParser.Parse(library, onImage),
                 _ => Failed(library, "Unsupported library kind")
             };
         }

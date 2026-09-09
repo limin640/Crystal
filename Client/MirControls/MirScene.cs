@@ -1,7 +1,6 @@
 ﻿using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirScenes;
-using SlimDX.Direct3D9;
 using S = ServerPackets;
 
 namespace Client.MirControls
@@ -53,25 +52,22 @@ namespace Client.MirControls
             if (ControlTexture == null || ControlTexture.Disposed)
             {
                 DXManager.ControlList.Add(this);
-                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height, 1, Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
+                ControlTexture = DXManager.CreateRenderTarget(Size.Width, Size.Height);
                 TextureSize = Size;
             }
-            Surface oldSurface = DXManager.CurrentSurface;
-            Surface surface = ControlTexture.GetSurfaceLevel(0);
-            DXManager.SetSurface(surface);
+            var oldSurface = DXManager.CurrentSurface;
+            DXManager.SetSurface(ControlTexture.GetSurface());
 
-            DXManager.Device.Clear(ClearFlags.Target, BackColour, 0, 0);
+            DXManager.Clear(BackColour);
 
             BeforeDrawControl();
             DrawChildControls();
             AfterDrawControl();
 
-            DXManager.Sprite.Flush();
-
+            DXManager.Flush();
 
             DXManager.SetSurface(oldSurface);
             TextureValid = true;
-            surface.Dispose();
         }
 
         public override void OnMouseDown(MouseEventArgs e)

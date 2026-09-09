@@ -18,8 +18,8 @@ namespace Client.MirGraphics
         public static Sprite Sprite;
         public static Line Line;
 
-        public static Surface CurrentSurface;
-        public static Surface MainSurface;
+        public static Crystal.Graphics.IGpuSurface CurrentSurface;
+        public static Crystal.Graphics.IGpuSurface MainSurface;
         public static PresentParameters Parameters;
         public static bool DeviceLost;
         public static float Opacity = 1F;
@@ -28,12 +28,12 @@ namespace Client.MirGraphics
         public static BlendMode BlendingMode;
 
 
-        public static Texture RadarTexture;
-        public static List<Texture> Lights = new List<Texture>();
-        public static Texture PoisonDotBackground;
+        public static Crystal.Graphics.IGpuTexture RadarTexture;
+        public static List<Crystal.Graphics.IGpuTexture> Lights = new List<Crystal.Graphics.IGpuTexture>();
+        public static Crystal.Graphics.IGpuTexture PoisonDotBackground;
 
-        public static Texture FloorTexture, LightTexture;
-        public static Surface FloorSurface, LightSurface;
+        public static Crystal.Graphics.IGpuTexture FloorTexture, LightTexture;
+        public static Crystal.Graphics.IGpuSurface FloorSurface, LightSurface;
 
         public static PixelShader GrayScalePixelShader;
         public static PixelShader NormalPixelShader;
@@ -90,13 +90,16 @@ namespace Client.MirGraphics
                 devFlags |= CreateFlags.PureDevice;
 
 
+            SlimDX.Configuration.EnableObjectTracking = true;
+
             Device = new Device(d3d, d3d.Adapters.DefaultAdapter.Adapter, devType, Program.Form.Handle, devFlags, Parameters);
 
             Device.SetDialogBoxMode(true);
 
-            LoadTextures();
-            LoadPixelsShaders();
+            LoadDeviceObjects();
             BindRenderer();
+            LoadManagedTextures();
+            LoadPixelsShaders();
         }
 
         static void BindRenderer()
@@ -133,42 +136,27 @@ namespace Client.MirGraphics
             }
         }
 
-        private static unsafe void LoadTextures()
+        private static void LoadDeviceObjects()
         {
             Sprite = new Sprite(Device);
             Line = new Line(Device) { Width = 1F };
-
-            MainSurface = Device.GetBackBuffer(0, 0);
-            CurrentSurface = MainSurface;
-            Device.SetRenderTarget(0, MainSurface);
-
-            if (RadarTexture == null || RadarTexture.Disposed)
-            {
-                RadarTexture = new Texture(Device, 2, 2, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-
-                DataRectangle stream = RadarTexture.LockRectangle(0, LockFlags.Discard);
-                using (Bitmap image = new Bitmap(2, 2, 8, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
-                using (Graphics graphics = Graphics.FromImage(image))
-                    graphics.Clear(Color.White);
-                RadarTexture.UnlockRectangle(0);
-            }
-            if (PoisonDotBackground == null || PoisonDotBackground.Disposed)
-            {
-                PoisonDotBackground = new Texture(Device, 5, 5, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-
-                DataRectangle stream = PoisonDotBackground.LockRectangle(0, LockFlags.Discard);
-                using (Bitmap image = new Bitmap(5, 5, 20, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
-                using (Graphics graphics = Graphics.FromImage(image))
-                    graphics.Clear(Color.White);
-                PoisonDotBackground.UnlockRectangle(0);
-            }
-            CreateLights();
-            BindRenderer();
         }
 
-        private unsafe static void CreateLights()
+        private static void LoadManagedTextures()
         {
+            MainSurface = Renderer.MainSurface;
+            CurrentSurface = MainSurface;
+            Renderer.SetSurface(MainSurface);
 
+            if (RadarTexture == null || RadarTexture.Disposed)
+                RadarTexture = Renderer.CreateSolidTexture(2, 2, Color.White);
+            if (PoisonDotBackground == null || PoisonDotBackground.Disposed)
+                PoisonDotBackground = Renderer.CreateSolidTexture(5, 5, Color.White);
+            CreateLights();
+        }
+
+        private static void CreateLights()
+        {
             for (int i = Lights.Count - 1; i >= 0; i--)
                 Lights[i].Dispose();
 
@@ -176,71 +164,92 @@ namespace Client.MirGraphics
 
             for (int i = 1; i < LightSizes.Length; i++)
             {
-                // int width = 125 + (57 *i);
-                //int height = 110 + (57 * i);
                 int width = LightSizes[i].X;
                 int height = LightSizes[i].Y;
-
-                Texture light = new Texture(Device, width, height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-
-                DataRectangle stream = light.LockRectangle(0, LockFlags.Discard);
-                using (Bitmap image = new Bitmap(width, height, width * 4, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
-                {
-                    using (Graphics graphics = Graphics.FromImage(image))
-                    {
-                        using (GraphicsPath path = new GraphicsPath())
-                        {
-                            //path.AddEllipse(new Rectangle(0, 0, width, height));
-                            //using (PathGradientBrush brush = new PathGradientBrush(path))
-                            //{
-                            //    graphics.Clear(Color.FromArgb(0, 0, 0, 0));
-                            //    brush.SurroundColors = new[] { Color.FromArgb(0, 255, 255, 255) };
-                            //    brush.CenterColor = Color.FromArgb(255, 255, 255, 255);
-                            //    graphics.FillPath(brush, path);
-                            //    graphics.Save();
-                            //}
-
-                            path.AddEllipse(new Rectangle(0, 0, width, height));
-                            using (PathGradientBrush brush = new PathGradientBrush(path))
-                            {
-                                Color[] blendColours = { Color.White,
-                                                     Color.FromArgb(255,210,210,210),
-                                                     Color.FromArgb(255,160,160,160),
-                                                     Color.FromArgb(255,70,70,70),
-                                                     Color.FromArgb(255,40,40,40),
-                                                     Color.FromArgb(0,0,0,0)};
-
-                                float[] radiusPositions = { 0f, .20f, .40f, .60f, .80f, 1.0f };
-
-                                ColorBlend colourBlend = new ColorBlend();
-                                colourBlend.Colors = blendColours;
-                                colourBlend.Positions = radiusPositions;
-
-                                graphics.Clear(Color.FromArgb(0, 0, 0, 0));
-                                brush.InterpolationColors = colourBlend;
-                                brush.SurroundColors = blendColours;
-                                brush.CenterColor = Color.White;
-                                graphics.FillPath(brush, path);
-                                graphics.Save();
-                            }
-                        }
-                    }
-                }
-
-                light.UnlockRectangle(0);
-                //light.Disposing += (o, e) => Lights.Remove(light);
-                Lights.Add(light);
+                byte[] bgra = RasterizeLight(width, height);
+                Lights.Add(Renderer.CreateTexture(width, height, bgra));
             }
         }
 
-        public static void SetSurface(Surface surface)
+        static byte[] RasterizeLight(int width, int height)
+        {
+            using var image = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            using (Graphics graphics = Graphics.FromImage(image))
+            using (GraphicsPath path = new GraphicsPath())
+            {
+                path.AddEllipse(new Rectangle(0, 0, width, height));
+                using PathGradientBrush brush = new PathGradientBrush(path);
+                Color[] blendColours =
+                {
+                    Color.White,
+                    Color.FromArgb(255, 210, 210, 210),
+                    Color.FromArgb(255, 160, 160, 160),
+                    Color.FromArgb(255, 70, 70, 70),
+                    Color.FromArgb(255, 40, 40, 40),
+                    Color.FromArgb(0, 0, 0, 0)
+                };
+                brush.InterpolationColors = new ColorBlend
+                {
+                    Colors = blendColours,
+                    Positions = new[] { 0f, .20f, .40f, .60f, .80f, 1.0f }
+                };
+                brush.SurroundColors = blendColours;
+                brush.CenterColor = Color.White;
+                graphics.Clear(Color.FromArgb(0, 0, 0, 0));
+                graphics.FillPath(brush, path);
+            }
+
+            var data = image.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                byte[] bgra = new byte[width * height * 4];
+                int srcStride = data.Stride;
+                for (int y = 0; y < height; y++)
+                    System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * srcStride, bgra, y * width * 4, width * 4);
+                return bgra;
+            }
+            finally
+            {
+                image.UnlockBits(data);
+            }
+        }
+
+        public static void SetSurface(Crystal.Graphics.IGpuSurface surface)
         {
             if (CurrentSurface == surface)
                 return;
 
-            Sprite.Flush();
+            Flush();
             CurrentSurface = surface;
-            Device.SetRenderTarget(0, surface);
+            Renderer?.SetSurface(surface);
+        }
+
+        public static void Clear(Color color) => Renderer?.Clear(color);
+        public static void Flush() => Renderer?.Flush();
+        public static void BeginFrame() => Renderer?.BeginFrame(Settings.ScreenWidth, Settings.ScreenHeight);
+        public static void EndFrame() => Renderer?.EndFrame();
+        public static void Present() => Renderer?.Present();
+        public static void SetMultiplyBlend() => Renderer?.SetMultiplyBlend();
+        public static Crystal.Graphics.IGpuTexture CreateRenderTarget(int width, int height) => Renderer.CreateRenderTarget(width, height);
+        public static Crystal.Graphics.IGpuTexture CreateManagedTexture(int width, int height, ReadOnlySpan<byte> bgra) => Renderer.CreateTexture(width, height, bgra);
+        public static void UpdateTexture(Crystal.Graphics.IGpuTexture texture, ReadOnlySpan<byte> bgra) => Renderer.UpdateTexture(texture, bgra);
+
+        public static byte[] CopyBitmapBgra(Bitmap image)
+        {
+            int width = image.Width, height = image.Height;
+            var data = image.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                byte[] bgra = new byte[width * height * 4];
+                int stride = data.Stride;
+                for (int y = 0; y < height; y++)
+                    System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * stride, bgra, y * width * 4, width * 4);
+                return bgra;
+            }
+            finally
+            {
+                image.UnlockBits(data);
+            }
         }
         public static void SetGrayscale(bool value)
         {
@@ -258,21 +267,6 @@ namespace Client.MirGraphics
                 Sprite.Flush();
                 Device.PixelShader = null;
             }
-        }
-
-        public static void DrawOpaque(Texture texture, Rectangle? sourceRect, Vector3? position, Color4 color, float opacity)
-        {
-            color.Alpha = opacity;
-            Draw(texture, sourceRect, position, color);
-        }
-
-        public static void Draw(Texture texture, Rectangle? sourceRect, Vector3? position, Color4 color)
-        {
-            if (Renderer is SlimDXRenderer slim)
-                slim.DrawLegacy(texture, sourceRect, position, color);
-            else
-                Sprite.Draw(texture, sourceRect, Vector3.Zero, position, color);
-            CMain.DPSCounter++;
         }
 
         public static void Draw(Crystal.Graphics.IGpuTexture texture, Rectangle? sourceRect, float x, float y, Color color)
@@ -296,6 +290,25 @@ namespace Client.MirGraphics
 
             Renderer.DrawQuad(texture, sourceRect, x, y, w, h, color, opacity);
             CMain.DPSCounter++;
+        }
+
+        /// <summary>
+        /// Windows-only backbuffer capture. SlimDX stays inside the adapter; CMain does not import D3D types.
+        /// </summary>
+        public static bool TrySaveScreenshot(string path, Action<Bitmap> overlay = null)
+        {
+            if (Device == null)
+                return false;
+
+            Surface backbuffer = Device.GetBackBuffer(0, 0);
+            using var stream = Surface.ToStream(backbuffer, ImageFileFormat.Png);
+            using var image = new Bitmap(stream);
+            overlay?.Invoke(image);
+            string folder = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(folder))
+                Directory.CreateDirectory(folder);
+            image.Save(path, ImageFormat.Png);
+            return true;
         }
 
         public static void AttemptReset()
@@ -338,7 +351,9 @@ namespace Client.MirGraphics
             DXManager.Parameters.PresentationInterval = Settings.FPSCap ? PresentInterval.Default : PresentInterval.Immediate;
             DXManager.Device.Reset(DXManager.Parameters);
 
-            DXManager.LoadTextures();
+            DXManager.LoadDeviceObjects();
+            DXManager.BindRenderer();
+            DXManager.LoadManagedTextures();
         }
 
         public static void AttemptRecovery()

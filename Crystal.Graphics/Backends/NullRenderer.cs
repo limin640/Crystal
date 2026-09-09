@@ -80,6 +80,16 @@ public sealed class NullRenderer : IRenderer
         return new MemoryTexture(width, height, data);
     }
 
+    public void UpdateTexture(IGpuTexture texture, ReadOnlySpan<byte> bgra)
+    {
+        if (texture is MemoryTexture mem)
+            mem.Bgra = bgra.ToArray();
+    }
+
+    public IGpuSurface GetSurface(IGpuTexture texture) => texture.GetSurface();
+
+    public void SetMultiplyBlend() => _log.Add("MultiplyBlend");
+
     public void DrawQuad(IGpuTexture texture, Rectangle? source, float destX, float destY, float destW, float destH, Color color, float opacity = 1)
     {
         DrawCount++;

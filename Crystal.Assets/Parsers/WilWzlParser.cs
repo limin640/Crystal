@@ -11,7 +11,7 @@ public static class WilWzlParser
 {
     static readonly int[] DefaultPalette = BuildDefaultPalette();
 
-    public static LibraryParseResult Parse(DiscoveredLibrary library)
+    public static LibraryParseResult Parse(DiscoveredLibrary library, Action<ParsedImage>? onImage = null)
     {
         if (library.Kind is LibraryKind.Wil or LibraryKind.Wzl or LibraryKind.Miz)
         {
@@ -77,18 +77,26 @@ public static class WilWzlParser
             int offset = indices[i];
             if (offset <= 0 || offset >= stream.Length)
             {
-                images.Add(new ParsedImage { Index = i, IsBlank = true });
+                var blank = new ParsedImage { Index = i, IsBlank = true };
+                images.Add(blank);
+                onImage?.Invoke(blank);
                 continue;
             }
 
             stream.Position = offset;
             try
             {
-                images.Add(ReadImage(reader, i, nType, version, palette, structureSize));
+                var image = ReadImage(reader, i, nType, version, palette, structureSize);
+                if (image.Bgra is { Length: > 0 })
+                    image.Decoded = true;
+                images.Add(image);
+                onImage?.Invoke(image);
             }
             catch (Exception ex)
             {
-                images.Add(new ParsedImage { Index = i, IsBlank = true });
+                var blank = new ParsedImage { Index = i, IsBlank = true };
+                images.Add(blank);
+                onImage?.Invoke(blank);
                 _ = ex;
             }
         }

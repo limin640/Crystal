@@ -51,19 +51,19 @@ Bake parsers live in `Crystal.Assets/Parsers/` and are Linux-safe (no GDI+, no S
 | --- | --- |
 | `Client/MirGraphics/DXManager.cs` | Device, Sprite, Line, surfaces, shaders, lights, `Draw` |
 | `Client/MirGraphics/MLibrary.cs` | **Migrated this PR** to `IGpuTexture` / `IRenderer.DrawQuad` |
-| `Client/Forms/CMain.cs` | `RenderForm`, `Device.BeginScene/Present`, idle loop |
-| `Client/MirControls/MirControl.cs` | Control render-target `Texture`, `Line.Draw` borders |
-| `Client/MirControls/MirLabel.cs` | LockRectangle text |
-| `Client/MirControls/MirTextBox.cs` | LockRectangle text |
-| `Client/MirControls/MirScene.cs` | D3D9 using (control RT) |
-| `Client/MirControls/MirGoodsCell.cs` | Vector types |
-| `Client/MirScenes/GameScene.cs` | Floor/light RTs, `Device.Clear`, `Sprite.Flush/Begin/End` |
-| `Client/MirScenes/Dialogs/MainDialogs.cs` | Radar `DXManager.Draw(Texture, …)` |
-| `Client/MirScenes/Dialogs/BigMapDialog.cs` | Radar dots |
-| `Client/MirScenes/Dialogs/QuestDialogs.cs` | unused `using SlimDX.Direct3D9` |
-| `Client/MirObjects/MapObject.cs` | Poison dots via RadarTexture |
-| `Client/MirGraphics/ParticleEngine.cs` | `SlimDX.Vector2` |
-| `Client/MirGraphics/Particles/*.cs` | `SlimDX.Vector2` |
+| `Client/Forms/CMain.cs` | **Migrated** to `Form` + `DXManager` frame facade; screenshot via adapter |
+| `Client/MirControls/MirControl.cs` | **Migrated** control RTs + `DrawLine` borders |
+| `Client/MirControls/MirLabel.cs` | **Migrated** GDI → `UpdateTexture` (no LockRectangle) |
+| `Client/MirControls/MirTextBox.cs` | **Migrated** GDI → `UpdateTexture` |
+| `Client/MirControls/MirScene.cs` | **Migrated** control RT |
+| `Client/MirControls/MirGoodsCell.cs` | **Migrated** `PointF[]` borders |
+| `Client/MirScenes/GameScene.cs` | **Migrated** floor/light RTs, light quads, multiply compose |
+| `Client/MirScenes/Dialogs/MainDialogs.cs` | **Migrated** radar `IGpuTexture` draws |
+| `Client/MirScenes/Dialogs/BigMapDialog.cs` | **Migrated** radar dots |
+| `Client/MirScenes/Dialogs/QuestDialogs.cs` | unused SlimDX using removed |
+| `Client/MirObjects/MapObject.cs` | **Migrated** poison dots |
+| `Client/MirGraphics/ParticleEngine.cs` | **Migrated** to `System.Numerics.Vector2` |
+| `Client/MirGraphics/Particles/*.cs` | **Migrated** to `System.Numerics.Vector2` |
 
 Windows-only binaries: `Components/SlimDX.dll`, `Client.csproj` `net8.0-windows7.0`, NAudio, WebView2.
 
@@ -71,14 +71,15 @@ Windows-only binaries: `Components/SlimDX.dll`, `Client.csproj` `net8.0-windows7
 
 **Behind `IRenderer` now**
 
-- `DXManager.Renderer` (SlimDX adapter on Windows)
+- `DXManager.Renderer` (SlimDX adapter on Windows; OpenGL/Null on Linux)
 - All `MLibrary` / `MImage` texture create + sprite draws
+- GameScene floor/light RTs, control/scene RTs, GDI labels, radar/poison, particles
+- `CMain` present loop (`Form`, not `RenderForm`)
 
-**Still SlimDX (next increments, not a content cut)**
+**Still SlimDX (Windows adapter only, not a content cut)**
 
-- Control / floor / light render targets
-- `CMain` present loop / `RenderForm`
-- Line borders, label LockRectangle, particles `Vector2`
+- `Device` / `Sprite` / `Line` / D3D reset inside `DXManager` + `SlimDXRenderer`
 - Pixel shaders (`normal.ps`, `grayscale.ps`, `magic.ps`)
+- Screenshot backbuffer read (`DXManager.TrySaveScreenshot`)
 
-Protocol, scenes, and `Libraries` catalog are unchanged.
+Protocol, scenes, and `Libraries` catalog are unchanged. Linux does not require SlimDX.

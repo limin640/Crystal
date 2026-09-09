@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Text.Json;
 using Crystal.Assets.Atlas;
+using Crystal.Assets.Imaging;
 using Crystal.Graphics;
 using Crystal.Graphics.Backends;
 using Silk.NET.Maths;
@@ -10,8 +11,8 @@ using Silk.NET.Windowing;
 namespace Client.Linux;
 
 /// <summary>
-/// Linux-capable Crystal client entry. Protocol/scenes stay on the Windows Client for now;
-/// this host proves the graphics stack compiles and runs on Linux.
+/// Linux-capable Crystal client entry. Protocol/scenes stay on the Windows Client;
+/// this host clears and draws batched atlas quads from a bake catalog.
 /// </summary>
 internal static class Program
 {
@@ -19,42 +20,66 @@ internal static class Program
     {
         bool headless = args.Any(a => a is "--headless" or "-h");
         string? catalogPath = GetOption(args, "--catalog");
-        int width = 1024, height = 768;
+        int width = GetInt(args, "--width") ?? 1024;
+        int height = GetInt(args, "--height") ?? 768;
+        int? frames = GetInt(args, "--frames");
 
         if (headless)
-            return RunHeadless(catalogPath, width, height);
+            return RunHeadless(catalogPath, width, height, frames ?? 1);
 
-        return RunWindow(catalogPath, width, height);
+        return RunWindow(catalogPath, width, height, frames);
     }
 
-    static int RunHeadless(string? catalogPath, int width, int height)
+    static int RunHeadless(string? catalogPath, int width, int height, int frames)
     {
         using IRenderer renderer = RendererFactory.CreateNull(width, height);
-        renderer.BeginFrame(width, height);
-        renderer.Clear(Color.Black);
-        renderer.SetBlend(true, 1f, Crystal.Graphics.BlendMode.NORMAL);
-
-        var probe = renderer.CreateSolidTexture(8, 8, Color.CornflowerBlue);
-        renderer.DrawQuad(probe, new System.Drawing.Rectangle(0, 0, 8, 8), 16, 16, 64, 64, Color.White);
-
+        CatalogGpu? catalog = null;
         if (catalogPath != null && File.Exists(catalogPath))
-            LoadCatalogInto(renderer, catalogPath);
+            catalog = LoadCatalogInto(renderer, catalogPath);
 
-        renderer.EndFrame();
-        renderer.Present();
+        for (int f = 0; f < Math.Max(1, frames); f++)
+        {
+            renderer.BeginFrame(width, height);
+            renderer.Clear(Color.Black);
+            renderer.SetBlend(true, 1f, Crystal.Graphics.BlendMode.NORMAL);
+
+            if (catalog == null)
+            {
+                var probe = renderer.CreateSolidTexture(8, 8, Color.CornflowerBlue);
+                renderer.DrawQuad(probe, new Rectangle(0, 0, 8, 8), 16, 16, 64, 64, Color.White);
+            }
+            else
+            {
+                DrawCatalog(renderer, catalog, width, height);
+            }
+
+            renderer.EndFrame();
+            renderer.Present();
+        }
 
         int draws = renderer is NullRenderer n ? n.DrawCount : 0;
         Console.WriteLine($"Client.Linux headless OK");
         Console.WriteLine($"  backend : {renderer.BackendName}");
         Console.WriteLine($"  kind    : {renderer.Kind}");
+        Console.WriteLine($"  frames  : {frames}");
         Console.WriteLine($"  draws   : {draws}");
+        Console.WriteLine($"  atlases : {catalog?.Textures.Count ?? 0}");
+        Console.WriteLine($"  sprites : {catalog?.Sprites.Count ?? 0}");
         Console.WriteLine($"  catalog : {(catalogPath == null ? "(none)" : catalogPath)}");
         Console.WriteLine("Runtime parity (login→select→walk→fight→loot→equip) is a later gate.");
+        catalog?.Dispose();
         return 0;
     }
 
-    static int RunWindow(string? catalogPath, int width, int height)
+    static int RunWindow(string? catalogPath, int width, int height, int? frames)
     {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"))
+            && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
+        {
+            Console.Error.WriteLine("No DISPLAY/WAYLAND_DISPLAY. Use --headless on servers without a display.");
+            return 4;
+        }
+
         var options = WindowOptions.Default with
         {
             Size = new Vector2D<int>(width, height),
@@ -64,13 +89,15 @@ internal static class Program
         using var window = Window.Create(options);
         IRenderer? renderer = null;
         GL? gl = null;
+        CatalogGpu? catalog = null;
+        int frameCount = 0;
 
         window.Load += () =>
         {
             gl = window.CreateOpenGL();
             renderer = RendererFactory.CreateOpenGL(gl, window.Size.X, window.Size.Y);
             if (catalogPath != null && File.Exists(catalogPath))
-                LoadCatalogInto(renderer, catalogPath);
+                catalog = LoadCatalogInto(renderer, catalogPath);
         };
 
         window.Render += _ =>
@@ -78,14 +105,24 @@ internal static class Program
             if (renderer == null) return;
             renderer.BeginFrame(window.Size.X, window.Size.Y);
             renderer.Clear(Color.FromArgb(255, 16, 16, 24));
-            var tex = renderer.CreateSolidTexture(2, 2, Color.White);
-            renderer.DrawQuad(tex, null, 32, 32, 128, 128, Color.MediumPurple);
-            tex.Dispose();
+            if (catalog != null)
+                DrawCatalog(renderer, catalog, window.Size.X, window.Size.Y);
+            else
+            {
+                var tex = renderer.CreateSolidTexture(2, 2, Color.MediumPurple);
+                renderer.DrawQuad(tex, null, 32, 32, 128, 128, Color.MediumPurple);
+                tex.Dispose();
+            }
             renderer.EndFrame();
+
+            frameCount++;
+            if (frames is int max && max > 0 && frameCount >= max)
+                window.Close();
         };
 
         window.Closing += () =>
         {
+            catalog?.Dispose();
             renderer?.Dispose();
             gl?.Dispose();
         };
@@ -93,6 +130,7 @@ internal static class Program
         try
         {
             window.Run();
+            Console.WriteLine($"Client.Linux windowed OK frames={frameCount} backend={renderer?.BackendName}");
             return 0;
         }
         catch (Exception ex)
@@ -103,16 +141,59 @@ internal static class Program
         }
     }
 
-    static void LoadCatalogInto(IRenderer renderer, string catalogPath)
+    static CatalogGpu LoadCatalogInto(IRenderer renderer, string catalogPath)
     {
         string json = File.ReadAllText(catalogPath);
-        var catalog = JsonSerializer.Deserialize<AtlasCatalog>(json);
-        if (catalog == null)
-            return;
+        var catalog = JsonSerializer.Deserialize<AtlasCatalog>(json)
+                      ?? throw new InvalidDataException($"Could not read catalog {catalogPath}");
+        string root = Path.GetDirectoryName(Path.GetFullPath(catalogPath)) ?? ".";
 
-        Console.WriteLine($"Loaded atlas catalog v{catalog.Version} sheets={catalog.Atlases.Count} sprites={catalog.Sprites.Count} compression={catalog.Compression}");
-        // Full GPU upload of every atlas sheet is the next increment after bake lands.
-        _ = renderer;
+        var textures = new Dictionary<int, IGpuTexture>();
+        foreach (var sheet in catalog.Atlases)
+        {
+            string png = Path.Combine(root, sheet.Png.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(png))
+            {
+                Console.Error.WriteLine($"  missing atlas PNG {sheet.Png}");
+                continue;
+            }
+
+            var (w, h, bgra) = PngReader.ReadBgra(png);
+            textures[sheet.Id] = renderer.CreateTexture(w, h, bgra);
+        }
+
+        var sprites = catalog.Sprites.Where(s => !s.Blank && s.Width > 0 && s.Height > 0).ToList();
+        Console.WriteLine($"Loaded atlas catalog v{catalog.Version} sheets={catalog.Atlases.Count} uploaded={textures.Count} sprites={sprites.Count} compression={catalog.Compression}");
+        return new CatalogGpu(textures, sprites);
+    }
+
+    static void DrawCatalog(IRenderer renderer, CatalogGpu catalog, int width, int height)
+    {
+        int x = 8, y = 8, rowH = 0;
+        foreach (var sprite in catalog.Sprites)
+        {
+            if (!catalog.Textures.TryGetValue(sprite.Atlas, out var tex))
+                continue;
+
+            var src = new Rectangle(sprite.X, sprite.Y, sprite.Width, sprite.Height);
+            float dw = Math.Clamp(sprite.Width, 4, 48);
+            float dh = Math.Clamp(sprite.Height, 4, 48);
+            renderer.DrawQuad(tex, src, x, y, dw, dh, Color.White);
+
+            x += (int)dw + 4;
+            rowH = Math.Max(rowH, (int)dh);
+            if (x > width - 56)
+            {
+                x = 8;
+                y += rowH + 4;
+                rowH = 0;
+            }
+            if (y > height - 8)
+            {
+                x = 8;
+                y = 8;
+            }
+        }
     }
 
     static string? GetOption(string[] args, string name)
@@ -121,5 +202,30 @@ internal static class Program
             if (args[i] == name)
                 return args[i + 1];
         return null;
+    }
+
+    static int? GetInt(string[] args, string name)
+    {
+        string? raw = GetOption(args, name);
+        return int.TryParse(raw, out int value) ? value : null;
+    }
+
+    sealed class CatalogGpu : IDisposable
+    {
+        public Dictionary<int, IGpuTexture> Textures { get; }
+        public List<AtlasSprite> Sprites { get; }
+
+        public CatalogGpu(Dictionary<int, IGpuTexture> textures, List<AtlasSprite> sprites)
+        {
+            Textures = textures;
+            Sprites = sprites;
+        }
+
+        public void Dispose()
+        {
+            foreach (var tex in Textures.Values)
+                tex.Dispose();
+            Textures.Clear();
+        }
     }
 }

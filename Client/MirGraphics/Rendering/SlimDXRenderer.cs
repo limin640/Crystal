@@ -43,9 +43,24 @@ namespace Client.MirGraphics.Rendering
             _current = _main;
         }
 
-        public void BeginFrame(int width, int height) { }
-        public void EndFrame() => Flush();
-        public void Present() { }
+        public void BeginFrame(int width, int height)
+        {
+            _device.BeginScene();
+            _sprite.Begin(SpriteFlags.AlphaBlend);
+        }
+
+        public void EndFrame()
+        {
+            Flush();
+            try { _sprite.End(); } catch { }
+            try { _device.EndScene(); } catch { }
+        }
+
+        public void Present()
+        {
+            try { _device.Present(); } catch { }
+        }
+
         public void Flush()
         {
             try { _sprite?.Flush(); }
@@ -123,6 +138,41 @@ namespace Client.MirGraphics.Rendering
                 data[i * 4 + 3] = color.A;
             }
             return CreateTexture(width, height, data);
+        }
+
+        public void UpdateTexture(IGpuTexture texture, ReadOnlySpan<byte> bgra)
+        {
+            if (texture is not SlimDXGpuTexture slim || slim.IsDisposed)
+                return;
+
+            DataRectangle rect = slim.Texture.LockRectangle(0, LockFlags.Discard);
+            try
+            {
+                int pitch = rect.Pitch;
+                IntPtr dest = rect.Data.DataPointer;
+                byte[] copy = bgra.ToArray();
+                if (pitch == slim.Width * 4)
+                    Marshal.Copy(copy, 0, dest, slim.Width * slim.Height * 4);
+                else
+                {
+                    for (int y = 0; y < slim.Height; y++)
+                        Marshal.Copy(copy, y * slim.Width * 4, dest + y * pitch, slim.Width * 4);
+                }
+            }
+            finally
+            {
+                slim.Texture.UnlockRectangle(0);
+            }
+        }
+
+        public IGpuSurface GetSurface(IGpuTexture texture) => texture.GetSurface();
+
+        public void SetMultiplyBlend()
+        {
+            Flush();
+            _device.SetRenderState(RenderState.AlphaBlendEnable, true);
+            _device.SetRenderState(RenderState.SourceBlend, SlimDX.Direct3D9.Blend.Zero);
+            _device.SetRenderState(RenderState.DestinationBlend, SlimDX.Direct3D9.Blend.SourceColor);
         }
 
         public void DrawQuad(IGpuTexture texture, Rectangle? source, float destX, float destY, float destW, float destH, Color color, float opacity = 1)
