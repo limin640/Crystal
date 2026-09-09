@@ -1,0 +1,131 @@
+using Silk.NET.OpenAL;
+
+namespace Crystal.Audio.Backends;
+
+/// <summary>Silk.NET OpenAL (OpenAL Soft on Linux). Windows Client still uses NAudio.</summary>
+public sealed class OpenALAudio : IAudio
+{
+    public AudioBackendKind Kind => AudioBackendKind.OpenAL;
+    public string BackendName => "Silk.NET OpenAL";
+    public bool IsHeadless => false;
+    public bool PlayOk { get; private set; }
+    public string? LastError { get; private set; }
+    public string? LastFile { get; private set; }
+
+    public bool PlayWav(string path)
+    {
+        LastFile = path;
+        PlayOk = false;
+        LastError = null;
+        if (!WavFile.TryLoadPcm(path, out var wav, out var loadErr))
+        {
+            LastError = loadErr;
+            return false;
+        }
+
+        // Soft can run without a speaker (null/pulse/alsa). Do not invent samples.
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ALSOFT_DRIVERS")))
+            Environment.SetEnvironmentVariable("ALSOFT_DRIVERS", "pulse,alsa,null");
+
+        AL? al = null;
+        ALContext? alc = null;
+        unsafe
+        {
+            Device* device = null;
+            Context* context = null;
+            uint buffer = 0;
+            uint source = 0;
+            try
+            {
+                al = AL.GetApi(true);
+                alc = ALContext.GetApi(true);
+                device = alc.OpenDevice("");
+                if (device == null)
+                {
+                    LastError = "alcOpenDevice failed (no OpenAL Soft device)";
+                    return false;
+                }
+
+                context = alc.CreateContext(device, null);
+                if (context == null || !alc.MakeContextCurrent(context))
+                {
+                    LastError = "alcCreateContext failed";
+                    return false;
+                }
+
+                BufferFormat format = (wav.Channels, wav.BitsPerSample) switch
+                {
+                    (1, 8) => BufferFormat.Mono8,
+                    (1, 16) => BufferFormat.Mono16,
+                    (2, 8) => BufferFormat.Stereo8,
+                    (2, 16) => BufferFormat.Stereo16,
+                    _ => 0
+                };
+                if (format == 0)
+                {
+                    LastError = $"unsupported OpenAL format ch={wav.Channels} bits={wav.BitsPerSample}";
+                    return false;
+                }
+
+                buffer = al.GenBuffer();
+                source = al.GenSource();
+                fixed (byte* p = wav.Data)
+                    al.BufferData(buffer, format, p, wav.Data.Length, wav.SampleRate);
+                al.SetSourceProperty(source, SourceInteger.Buffer, buffer);
+                al.SetSourceProperty(source, SourceFloat.Gain, 0.4f);
+                al.SourcePlay(source);
+
+                int wait = Math.Clamp(wav.DurationMs + 80, 50, 2000);
+                var until = DateTime.UtcNow.AddMilliseconds(wait);
+                int state = (int)SourceState.Playing;
+                while (DateTime.UtcNow < until)
+                {
+                    al.GetSourceProperty(source, GetSourceInteger.SourceState, out state);
+                    if (state != (int)SourceState.Playing && state != (int)SourceState.Initial)
+                        break;
+                    Thread.Sleep(10);
+                }
+
+                PlayOk = true;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.GetType().Name + ": " + ex.Message;
+                return false;
+            }
+            finally
+            {
+                try
+                {
+                    if (al != null)
+                    {
+                        if (source != 0)
+                        {
+                            al.SourceStop(source);
+                            al.DeleteSource(source);
+                        }
+                        if (buffer != 0)
+                            al.DeleteBuffer(buffer);
+                    }
+                    if (alc != null)
+                    {
+                        alc.MakeContextCurrent(null);
+                        if (context != null)
+                            alc.DestroyContext(context);
+                        if (device != null)
+                            alc.CloseDevice(device);
+                    }
+                }
+                catch
+                {
+                    // device teardown must not break headless hosts
+                }
+                al?.Dispose();
+                alc?.Dispose();
+            }
+        }
+    }
+
+    public void Dispose() { }
+}

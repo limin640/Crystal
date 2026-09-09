@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Crystal.Audio</RootNamespace>
+    <Description>Cross-platform audio abstraction. Linux: Silk.NET OpenAL. Headless: Null. Windows Client keeps NAudio.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.OpenAL" Version="2.22.0" />
+  </ItemGroup>
+
+</Project>

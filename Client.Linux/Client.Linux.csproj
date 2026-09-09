@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Crystal.Graphics\Crystal.Graphics.csproj" />
     <ProjectReference Include="..\Crystal.Assets\Crystal.Assets.csproj" />
+    <ProjectReference Include="..\Crystal.Audio\Crystal.Audio.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 

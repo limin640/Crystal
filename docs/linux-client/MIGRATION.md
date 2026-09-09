@@ -204,8 +204,8 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Mini-map WIL (`MMap.Lib`) / big map | Stub — no invented map art |
 | CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
-| **Audio (NAudio)** | Deferred — `Client` uses NAudio WASAPI/WaveOut on `net8.0-windows`; no ALSA/Pulse/`IRenderer` audio path. Not a Linux verb blocker |
-| **WebView2** | Deferred — Microsoft.Web.WebView2 WinForms (patcher/news). No Linux WebView2 runtime; not a verb blocker |
+| **Audio** | **In progress** — `Crystal.Audio` `IAudio`: Null (headless), Silk.NET OpenAL on Linux, NAudio stays in Windows `SoundManager`. `--play-sound` / `--sound` / `CRYSTAL_SOUND`. Fixture `Tools/Crystal.Audio/fixtures/tone.wav` (not game art). Do not vendor the Sound pack |
+| **WebView2** | Windows-only, permanently deferred on Linux. `Client.Linux` never references it; a no-op browser stub is unnecessary |
 
 ```bash
 # headless multi-step input after StartGame (does not replace the hard-gate --connect path)
@@ -420,7 +420,7 @@ Mouse-drag chrome (SelectedCell ghost, WIL item icons, click-to-drop) stays defe
 ## Remaining gaps (OK to defer)
 
 1. **Full GameScene** — Client.Linux is Shared packets + `MapView` + HUD, not a language rewrite of the WinForms scene graph.
-2. **Audio / WebView2 / mouse-drag chrome** — documented stubs; not a Linux verb blocker. NAudio is WASAPI/WaveOut-only; WebView2 is a WinForms Evergreen control. Bag `C.MoveItem` is in progress. Quest accept stays stubbed.
+2. **WebView2 / mouse-drag chrome** — WebView2 is Windows-only (WinForms Evergreen; no Linux runtime). Mouse-drag chrome stays cosmetic. Audio is `IAudio` (OpenAL / Null); Windows keeps NAudio. Quest accept stays stubbed.
 3. **Operator art** — floor/objects still catalog or `--data` `.Lib`; 86 catalog slots remain missing-on-disk. No invented WIL.
 4. **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 

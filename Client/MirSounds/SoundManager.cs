@@ -4,6 +4,10 @@ using NAudio.Wave.SampleProviders;
 
 namespace Client.MirSounds
 {
+    /// <summary>
+    /// Windows NAudio host (WaveOutEvent). Linux uses Crystal.Audio IAudio (Silk.NET OpenAL / Null).
+    /// Do not rewrite this graph on Linux; Client.Linux never references NAudio.
+    /// </summary>
     public static class SoundManager
     {
         private static Dictionary<int, string> _indexList => SoundList.Indexes;

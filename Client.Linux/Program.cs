@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Text.Json;
 using Crystal.Assets.Atlas;
 using Crystal.Assets.Imaging;
+using Crystal.Audio;
 using Crystal.Graphics;
 using Crystal.Graphics.Backends;
 using Silk.NET.Input;
@@ -52,6 +53,7 @@ internal static class Program
 
         try
         {
+            ReportSound(args, headless);
             if (headless)
             {
                 int drawCode = RunHeadless(catalogPath, mapsRoot, dataRoot, width, height, frames ?? 1, session);
@@ -449,6 +451,21 @@ internal static class Program
                 y = 8;
             }
         }
+    }
+
+    static void ReportSound(string[] args, bool headless)
+    {
+        bool play = args.Contains("--play-sound");
+        using IAudio audio = AudioFactory.Create(headless, play);
+        if (!play)
+        {
+            Console.WriteLine($"sound: backend={audio.BackendName} SoundPlayOk=False skipped={(headless ? "headless" : "no --play-sound")}");
+            return;
+        }
+
+        string clip = SoundResolve.Resolve(GetOption(args, "--sound"));
+        bool ok = File.Exists(clip) && audio.PlayWav(clip);
+        Console.WriteLine($"SoundPlayOk={ok} backend={audio.BackendName} file={clip} err={audio.LastError ?? "-"}");
     }
 
     static string? GetOption(string[] args, string name)

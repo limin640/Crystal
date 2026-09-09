@@ -14,6 +14,7 @@ These projects are the Linux-capable path:
 ```bash
 dotnet build Crystal.Assets/Crystal.Assets.csproj -c Release
 dotnet build Crystal.Graphics/Crystal.Graphics.csproj -c Release
+dotnet build Crystal.Audio/Crystal.Audio.csproj -c Release
 dotnet build Tools/Crystal.Bake/Crystal.Bake.csproj -c Release
 dotnet build Server/Server.Library.csproj -c Release
 dotnet build Server.Linux/Server.Linux.csproj -c Release
@@ -151,6 +152,8 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--auto-trade-reply` | On `S.TradeRequest`, send `C.TradeReply` `AcceptInvite=true` |
 | `--auto-trade-confirm` | On `S.TradeGold` / `S.TradeItem`, send `C.TradeConfirm` `Locked=true` |
 | `--keep-alive <ms>` | Pump after the input script so a second client can finish the trade |
+| `--play-sound` | Play one WAV through Silk.NET OpenAL (even when `--headless`). Hard-gate omits this and uses Null |
+| `--sound <path>` | Operator Sound file or directory (`CRYSTAL_SOUND`). Not vendored. Fixture: `Tools/Crystal.Audio/fixtures/tone.wav` |
 | `--input-step-ms` | Delay between injected commands (default 400) |
 | `--window` | Silk.NET OpenGL + keyboard/mouse after `--connect` (inventory/equip HUD on IRenderer) |
 | `--enter-wait-ms` | How long to wait for `MapInformation` / `UserInformation` |
@@ -172,6 +175,7 @@ Needs Windows + SlimDX (`Components\SlimDX.dll`). Will **not** compile on Linux 
 ```bash
 # Linux: build only the portable projects (the .sln also contains WinExe projects)
 dotnet build Crystal.Assets/Crystal.Assets.csproj Crystal.Graphics/Crystal.Graphics.csproj \
+  Crystal.Audio/Crystal.Audio.csproj \
   Tools/Crystal.Bake/Crystal.Bake.csproj Server/Server.Library.csproj \
   Server.Linux/Server.Linux.csproj Client.Linux/Client.Linux.csproj
 ```
