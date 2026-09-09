@@ -507,9 +507,6 @@ internal sealed class CrystalSession : IDisposable
         Chat("@LEVEL 15");
         Pump(600);
 
-        Chat($"@MOVE {UserLocation.X + 8} {UserLocation.Y}");
-        Pump(800);
-
         TryFight();
         TryLoot();
         TryEquip();
@@ -567,28 +564,8 @@ internal sealed class CrystalSession : IDisposable
         uint goldBefore = _goldGained;
         Pump(400);
         var drop = _ground.LastOrDefault();
-        if (drop != null)
-        {
-            if (drop.Location != UserLocation)
-            {
-                Chat($"@MOVE {drop.Location.X} {drop.Location.Y}");
-                Pump(700);
-            }
-            Send(new C.PickUp());
-            Pump(700);
-            if (_bag.Count > bagBefore || _goldGained > goldBefore)
-            {
-                MarkLoot(_goldGained > goldBefore
-                    ? $"PickUp gold +{_goldGained - goldBefore} at {drop.Location.X},{drop.Location.Y}"
-                    : $"PickUp ground {drop.Name} at {drop.Location.X},{drop.Location.Y} bag {_bag.Count}");
-                return;
-            }
-            if (_ground.Count > 0)
-            {
-                Send(new C.PickUp());
-                Pump(500);
-            }
-        }
+        if (drop != null && TryPickGround(drop, bagBefore, goldBefore))
+            return;
 
         if (_bag.Count > bagBefore)
         {
@@ -621,17 +598,53 @@ internal sealed class CrystalSession : IDisposable
         ulong uid = seed.UniqueID;
         string seedName = ItemName(seed);
         _bag.Remove(uid);
-        Send(new C.DropItem { UniqueID = uid, Count = Math.Max((ushort)1, seed.Count) });
-        Pump(700);
-        Chat($"@MOVE {UserLocation.X} {UserLocation.Y}");
-        Pump(200);
-        int bagMid = _bag.Count;
-        Send(new C.PickUp());
+        Send(new C.DropItem { UniqueID = uid, Count = 1 });
         Pump(800);
-        if (_bag.ContainsKey(uid) || _bag.Count > bagMid)
-            MarkLoot($"PickUp seeded {seedName} uid={uid} bag={_bag.Count}");
-        else
-            Note($"loot: PickUp after drop did not restore {seedName}");
+        var seeded = _ground.LastOrDefault(g => g.Name.Contains(seedName, StringComparison.OrdinalIgnoreCase))
+                     ?? _ground.LastOrDefault();
+        if (seeded != null && TryPickGround(seeded, _bag.Count, _goldGained))
+            return;
+
+        // Stand on the drop: walk every adjacent step then PickUp.
+        foreach (MirDirection dir in Enum.GetValues<MirDirection>())
+        {
+            Send(new C.Walk { Direction = dir });
+            Pump(400);
+            Send(new C.PickUp());
+            Pump(400);
+            if (_bag.ContainsKey(uid) || _bag.Count > bagBefore || _goldGained > goldBefore)
+            {
+                MarkLoot($"PickUp seeded {seedName} uid={uid} after walk {dir}");
+                return;
+            }
+        }
+        Note($"loot: PickUp after drop did not restore {seedName}");
+    }
+
+    bool TryPickGround(GroundLoot drop, int bagBefore, uint goldBefore)
+    {
+        WalkToward(drop.Location, 6);
+        Send(new C.PickUp());
+        Pump(700);
+        if (_bag.Count > bagBefore || _goldGained > goldBefore || _bag.Values.Any(i => ItemName(i).Contains(drop.Name.Split(':')[0], StringComparison.OrdinalIgnoreCase)))
+        {
+            MarkLoot(_goldGained > goldBefore
+                ? $"PickUp gold +{_goldGained - goldBefore} at {drop.Location.X},{drop.Location.Y}"
+                : $"PickUp ground {drop.Name} at {drop.Location.X},{drop.Location.Y} bag={_bag.Count}");
+            return true;
+        }
+        return false;
+    }
+
+    void WalkToward(Point dest, int steps)
+    {
+        for (int i = 0; i < steps && UserLocation != dest; i++)
+        {
+            MirDirection dir = Functions.DirectionFromPoint(UserLocation, dest);
+            WalkSent = true;
+            Send(new C.Walk { Direction = dir });
+            Pump(350);
+        }
     }
 
     void TryEquip()
