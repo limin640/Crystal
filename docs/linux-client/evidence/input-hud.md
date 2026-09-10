@@ -229,6 +229,18 @@ Windows `SoundManager` calls through `IAudio` (`NAudioAudio`). WebView2 is Windo
 
 **`--connect --headless`**: **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `sound: backend=Null (headless)`
 
+## Quest accept / turn-in (later)
+
+`--no-gate --input-script QuestAccept,QuestFinish` → `C.AcceptQuest` / `C.FinishQuest`. **EXIT:0**
+
+```
+AcceptQuest id=1 name=Assistant's Request S.ChangeQuest Add taken=True completed=True
+FinishQuest id=1 name=Assistant's Request S.ChangeQuest Remove
+QuestAcceptOk=True QuestFinishOk=True
+```
+
+**Hard-gate** `--connect --headless`: **EXIT:0** — `quests=0` `QuestAcceptOk=False`.
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons / `MMap.Lib` / MagIcon stay pack-missing. Quest accept/turn-in stays stubbed. Do not vendor Sound packs; fixture wav is not game art. See `MIGRATION.md` residuals checklist.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons / `MMap.Lib` / MagIcon stay pack-missing. Do not vendor Sound packs; fixture wav is not game art. See `MIGRATION.md` residuals checklist.

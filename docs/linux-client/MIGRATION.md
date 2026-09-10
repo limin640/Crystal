@@ -500,9 +500,27 @@ sound: backend=Null (headless) SoundPlayOk=False skipped=headless
 
 Same packets as WinForms `QuestListDialog`: `C.AcceptQuest` `{ NPCIndex, QuestIndex }`, `C.FinishQuest` `{ QuestIndex, SelectedItemIndex }`. Catalog from `S.NewQuestInfo`; taken/done from `S.ChangeQuest` / `S.CompleteQuest`. Headless tokens `QuestAccept` / `QuestFinish` (optional `:id`). Approaches the giver already in view or via Talk `@MOVE 289 617`. No invented quest files.
 
-**Input-script** `--no-gate --input-script QuestAccept,QuestFinish`: evidence pending this run.
+**Input-script** `--no-gate --input-script QuestAccept,QuestFinish`: **EXIT:0**
 
-**Hard-gate** (no `--input-script`): must stay **EXIT:0** with `quests=0` `AcceptOk=False`.
+```
+input AcceptQuest npc=3 id=1 name=Assistant's Request
+S.ChangeQuest Add id=1 name=Assistant's Request taken=True completed=True
+input FinishQuest id=1 selected=-1 name=Assistant's Request
+S.ChangeQuest Remove id=1 name=Assistant's Request
+QuestAcceptOk=True QuestFinishOk=True
+  hud-quest-accept AcceptQuest id=1 name=Assistant's Request S.ChangeQuest Add taken=True completed=True
+  hud-quest-finish FinishQuest id=1 name=Assistant's Request S.ChangeQuest Remove
+```
+
+Starter Jev quest 1 has no kill/item tasks, so it completes on accept and turn-in is CraftLady (in DataRange after the Jane approach).
+
+**Hard-gate** (no `--input-script`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+hud quest: info=154 taken=0 done=1 accepts=0 AcceptOk=False FinishOk=False
+  input   : quests=0 QuestAcceptOk=False QuestFinishOk=False
+```
 
 ## Remaining residuals (checklist)
 
