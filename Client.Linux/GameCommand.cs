@@ -27,7 +27,8 @@ internal enum GameCommandKind
     QuestAbandon,
     QuestShare,
     Mag,
-    MagTarget
+    MagTarget,
+    BigMap
 }
 
 internal readonly struct GameCommand
@@ -64,4 +65,6 @@ internal readonly struct GameCommand
     public static GameCommand Mag(string spell = "", int targetId = 0) => new() { Kind = GameCommandKind.Mag, Text = spell ?? "", Slot = 0, Dest = targetId };
     /// <summary><c>C.Magic</c> with <c>SpellTargetLock=true</c> (WinForms targeting).</summary>
     public static GameCommand MagTarget(string spell = "", int targetId = 0) => new() { Kind = GameCommandKind.MagTarget, Text = spell ?? "", Slot = 0, Dest = targetId };
+    /// <summary>Toggle WinForms-style big-map chrome (<c>KeybindOptions.Bigmap</c> / B).</summary>
+    public static GameCommand BigMap(string mode = "") => new() { Kind = GameCommandKind.BigMap, Text = mode ?? "", Slot = 0 };
 }

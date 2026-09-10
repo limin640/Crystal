@@ -299,6 +299,14 @@ hud mmap: MagIcon2Ok=True mag2Draws=1 mag2Index=0 mag2Src=/tmp/crystal-mmap-samp
 
 **Case-fold** `--data /tmp/crystal-mmap-case` (`magicon2.Lib` only): **EXIT:0** — `src=/tmp/crystal-mmap-case/magicon2.Lib` mag2Draws=1.
 
+## Big-map dialog (later)
+
+IRenderer chrome (WinForms `BigMapDialog` / B). MapReader size + `MMap.Lib` when `--data` has the file. `--input-script BigMap`. No invented map art.
+
+**Hard-gate** (closed / no `--data`): **EXIT:0** — `BigMapOk=False` draws=0.
+
+**Smoke** `--input-script BigMap` + `--data`: **EXIT:0** — `BigMapOk=True` draws≥1.
+
 ## Version hash (later)
 
 Same MD5-of-file as WinForms. Server `--version-path` / Client `--version-file` (default `Crystal.Client.Linux.dll`). `--no-version-check` is opt-out. Do not vendor `Mir2.Exe`.

@@ -25,6 +25,8 @@ internal sealed class SceneHud : IDisposable
     public int ChatDraws { get; private set; }
     public int MiniMapDraws { get; private set; }
     public int MiniMapBlips { get; private set; }
+    public int BigMapDraws { get; private set; }
+    public int BigMapBlips { get; private set; }
     public int NpcDraws { get; private set; }
     public int BagFilled { get; private set; }
     public int EquipFilled { get; private set; }
@@ -81,6 +83,7 @@ internal sealed class SceneHud : IDisposable
         DrawSkillBook(312, height - 118, session);
         DrawChatLog(16, height - 176, session);
         DrawNpcPanel(270, 56, session);
+        DrawBigMap(width, height, session, mapView);
 
         int barW = Math.Min(220, width / 3);
         int hp = session.UserHP;
@@ -108,13 +111,14 @@ internal sealed class SceneHud : IDisposable
         Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} gold={session.UserGold} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
         Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex}");
         Console.WriteLine($"hud mmap: MMapOk={_libs?.MMapOk ?? false} MagIconOk={_libs?.MagIconOk ?? false} MagIcon2Ok={_libs?.MagIcon2Ok ?? false} mmapDraws={_libs?.MMapTileDraws ?? 0} magDraws={_libs?.MagIconTileDraws ?? 0} mag2Draws={_libs?.MagIcon2TileDraws ?? 0} mmapIndex={_libs?.MMapDrawIndex ?? -1} magIndex={_libs?.MagIconDrawIndex ?? -1} mag2Index={_libs?.MagIcon2DrawIndex ?? -1} mmapSrc={_libs?.MMapSource ?? "-"} magSrc={_libs?.MagIconSource ?? "-"} mag2Src={_libs?.MagIcon2Source ?? "-"} images={_libs?.MMapImages ?? 0}/{_libs?.MagIconImages ?? 0}/{_libs?.MagIcon2Images ?? 0}");
+        Console.WriteLine($"hud bigmap: open={session.BigMapOpen} BigMapOk={session.BigMapOk} draws={session.BigMapDraws} blips={session.BigMapBlips} mmap={session.BigMapMmapDrawn} index={session.BigMapIndex} mini={session.MiniMapIndex} size={session.MapWidth}x{session.MapHeight} src={_libs?.MMapSource ?? "-"}");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
         Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count} gold={session.UserGold} bag={session.BagCount} buys={session.InputBuys} sells={session.InputSells} BuyOk={session.BuyOk} SellOk={session.SellOk}");
         Console.WriteLine($"hud quest: info={session.QuestCatalog.Count} taken={session.TakenQuests.Count} done={session.CompletedQuestIds.Count} accepts={session.InputQuests} AcceptOk={session.QuestAcceptOk} FinishOk={session.QuestFinishOk}");
         Console.WriteLine($"hud trade: handshake={session.TradeHandshakeOk} done={session.TradeDone} partner={session.TradePartnerName ?? "-"} invite={session.TradeInviteFrom ?? "-"} goldSeen={session.TradeGoldSeen} deposit={session.TradeDepositOk}");
         Console.WriteLine($"hud drag: ok={session.DragOk} moves={session.InputDrags} merge={session.MergeOk} {session.DragEvidence ?? "-"}");
         Console.WriteLine($"hud-drag ghost={DragGhostDraws} from={session.SelectedSlot} to={session.DragHoverSlot}");
-        Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} minimap={MiniMapDraws} npc={NpcDraws} total={HudDraws}");
+        Console.WriteLine($"hud draws: inv={InventoryDraws} equip={EquipDraws} belt={BeltDraws} skill={SkillDraws} chat={ChatDraws} minimap={MiniMapDraws} bigmap={BigMapDraws} npc={NpcDraws} total={HudDraws}");
         for (int i = 0; i < session.InventorySlots.Count; i++)
         {
             var it = session.InventorySlots[i];
@@ -165,8 +169,8 @@ internal sealed class SceneHud : IDisposable
 
     void ResetCounts()
     {
-        HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = MiniMapDraws = NpcDraws = 0;
-        MiniMapBlips = BagFilled = EquipFilled = BeltFilled = SkillsFilled = DragGhostDraws = 0;
+        HudDraws = InventoryDraws = EquipDraws = BeltDraws = SkillDraws = ChatDraws = MiniMapDraws = NpcDraws = BigMapDraws = 0;
+        MiniMapBlips = BagFilled = EquipFilled = BeltFilled = SkillsFilled = DragGhostDraws = BigMapBlips = 0;
     }
 
     /// <summary>
@@ -343,6 +347,92 @@ internal sealed class SceneHud : IDisposable
             Text(x + 8, y + size / 2, "NO SIZE", Color.Gray);
 
         MiniMapDraws = HudDraws - before;
+    }
+
+    /// <summary>
+    /// WinForms <c>BigMapDialog</c> draws <c>Libraries.MiniMap</c> at <c>MapInfo.BigMap</c>.
+    /// Linux uses MapReader size + the same <c>MMap.Lib</c> frames when <c>--data</c> has them. No invented tiles.
+    /// </summary>
+    void DrawBigMap(int width, int height, CrystalSession session, MapView? mapView)
+    {
+        if (!session.BigMapOpen)
+        {
+            session.MarkBigMapDraw(0, 0, false);
+            return;
+        }
+
+        int before = HudDraws;
+        int panelW = Math.Min(640, Math.Max(320, width - 48));
+        int panelH = Math.Min(400, Math.Max(220, height - 96));
+        int x = (width - panelW) / 2;
+        int y = 48;
+        Fill(x, y, panelW, panelH, Color.FromArgb(220, 12, 16, 20));
+        Text(x + 8, y + 4, "BIGMAP", Color.PaleGoldenrod);
+        Text(x + 72, y + 4, session.MapTitle ?? "?", Color.White);
+        Text(x + panelW - 140, y + 4, $"[{session.UserLocation.X},{session.UserLocation.Y}]", Color.Gainsboro);
+
+        int ox = x + 8;
+        int oy = y + 20;
+        int innerW = panelW - 16;
+        int innerH = panelH - 36;
+        Fill(ox, oy, innerW, innerH, Color.FromArgb(255, 10, 16, 12));
+
+        int mw = mapView is { MapLoaded: true } ? mapView.MapWidth : session.MapWidth;
+        int mh = mapView is { MapLoaded: true } ? mapView.MapHeight : session.MapHeight;
+        int frame = session.BigMapIndex > 0 ? session.BigMapIndex : session.MiniMapIndex;
+        bool mmapTile = _libs != null && _libs.TryDrawMMap(frame, ox, oy, innerW, innerH);
+        if (mmapTile)
+            Text(x + 8, y + panelH - 14, "MMAP", Color.Khaki);
+        else
+            Text(x + 8, y + panelH - 14, mw > 0 ? $"{mw}x{mh}" : "NO SIZE", Color.DarkSeaGreen);
+
+        if (mw > 0 && mh > 0)
+        {
+            var cells = mapView is { MapLoaded: true } ? mapView.Cells : null;
+            const int samples = 48;
+            if (!mmapTile && cells != null)
+            {
+                float cw = innerW / (float)samples;
+                float ch = innerH / (float)samples;
+                for (int sy = 0; sy < samples; sy++)
+                {
+                    int my = Math.Clamp(sy * mh / samples, 0, Math.Max(0, mh - 1));
+                    for (int sx = 0; sx < samples; sx++)
+                    {
+                        int mx = Math.Clamp(sx * mw / samples, 0, Math.Max(0, mw - 1));
+                        if (mx >= cells.GetLength(0) || my >= cells.GetLength(1)) continue;
+                        var cell = cells[mx, my];
+                        if (cell.BackImage == 0 || cell.BackIndex == -1) continue;
+                        Fill(ox + (int)(sx * cw), oy + (int)(sy * ch), Math.Max(1, (int)cw), Math.Max(1, (int)ch), Color.FromArgb(160, 24, 40, 28));
+                    }
+                }
+            }
+
+            void Blip(int cellX, int cellY, Color color, int w = 3)
+            {
+                int px = ox + (int)(cellX / (float)mw * innerW) - w / 2;
+                int py = oy + (int)(cellY / (float)mh * innerH) - w / 2;
+                Fill(px, py, w, w, color);
+                BigMapBlips++;
+            }
+
+            foreach (var obj in session.Objects)
+            {
+                if (obj.ObjectID == session.UserObjectId) continue;
+                var color = obj.Kind switch
+                {
+                    "monster" => Color.FromArgb(255, 180, 48, 48),
+                    "npc" => Color.FromArgb(255, 80, 160, 220),
+                    "item" or "gold" => Color.Gold,
+                    _ => Color.Gray
+                };
+                Blip(obj.Location.X, obj.Location.Y, color, 2);
+            }
+            Blip(session.UserLocation.X, session.UserLocation.Y, Color.Yellow, 5);
+        }
+
+        BigMapDraws = HudDraws - before;
+        session.MarkBigMapDraw(BigMapDraws, BigMapBlips, mmapTile);
     }
 
     void DrawEquipPanel(int x, int y, CrystalSession session)

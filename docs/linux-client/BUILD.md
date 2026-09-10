@@ -152,7 +152,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |
 | `--no-gate` | Stop after walk (skip scripted Attack / PickUp / EquipItem) |
-| `--input-script` | After StartGame, inject Crystal keys. `Mag` / `Mag:Fencing` / `MagTarget` / `MagTarget:id` → `C.Magic` (`SpellTargetLock` on MagTarget). `QuestAccept` / `QuestFinish` → quest packets. `Drag` / `Merge` → bag move. Map teleport stays `Move:x:y` (`@MOVE`). |
+| `--input-script` | After StartGame, inject Crystal keys. `BigMap` / `BigMap:on` / `BigMap:off` / `B` → IRenderer big-map chrome (WinForms `KeybindOptions.Bigmap`). `Mag` / `MagTarget` → `C.Magic`. `QuestAccept` / `QuestFinish` → quest packets. `Drag` / `Merge` → bag move. Map teleport stays `Move:x:y` (`@MOVE`). |
 | `--auto-trade-reply` | On `S.TradeRequest`, send `C.TradeReply` `AcceptInvite=true` |
 | `--auto-trade-confirm` | On `S.TradeGold` / `S.TradeItem`, send `C.TradeConfirm` `Locked=true` |
 | `--keep-alive <ms>` | Pump after the input script so a second client can finish the trade |

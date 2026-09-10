@@ -201,7 +201,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Inventory bag move (`C.MoveItem` / `C.MergeItem`) | **In progress** — `--input-script Drag:0,8` / `Merge:from,to`; HUD slot refresh. Same packets as `MirItemCell` |
 | Mouse-drag chrome (SelectedCell ghost / click-to-drop) | **In progress** — IRenderer colored-quad ghost + source/dest highlight on `Drag`. Windowed left-click pick/drop on bag/belt if Silk.NET mouse coords exist. Headless keeps `Drag:from,to` tokens. **No WIL item icons** |
 | Magic targeting / skill icons (`MagIcon` / `MagIcon2`) | **In progress** — both libs via `DataPath` + `IRenderer` when `--data` has them. Skill-book chrome uses `MagIcon2` at `Icon * 2` (WinForms `MagicButton`). `--input-script Mag` / `MagTarget` → `C.Magic` (`SpellTargetLock` on MagTarget). Warrior with no learned spell still sends; `S.Magic` is optional |
-| Mini-map WIL (`MMap.Lib`) / big map | **In progress** — `MMap.Lib` when `--data` has the file; skip when absent (no invented map art). Big-map dialog still stub |
+| Mini-map WIL (`MMap.Lib`) / big map | **In progress** — `MMap.Lib` when `--data` has the file; skip when absent (no invented map art). Big-map chrome: `--input-script BigMap` / windowed B. MapReader size + `MMap.Lib` frames (`MapInformation.BigMap`, else MiniMap). Leftover: world-map overlay (`Prguse2` / `MapLinkIcon`), NPC teleport, `SearchMap` chrome |
 | CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
 | **Audio** | **In progress** — `Crystal.Audio` `IAudio`: Null (headless), Silk.NET OpenAL on Linux, **NAudio backend** on Windows. `SoundManager` is the GameScene index API and calls through `IAudio` (`AudioFactory.CreateNAudio()`). `--play-sound` / `--sound` / `CRYSTAL_SOUND`. Fixture `Tools/Crystal.Audio/fixtures/tone.wav` (not game art). Do not vendor the Sound pack |
@@ -610,6 +610,16 @@ hud-lib ready MMapOk=True MagIconOk=True MagIcon2Ok=True images=4/4/4
 hud mmap: MagIcon2Ok=True mag2Draws=1 mag2Src=/tmp/crystal-mmap-case/magicon2.Lib
 ```
 
+### Big-map dialog (2026-09-10, same VM)
+
+WinForms `BigMapDialog` toggles with `KeybindOptions.Bigmap` (B) and draws `Libraries.MiniMap` (`MMap.Lib`) at `ClientMapInfo.BigMap`. `Show()` returns if `MapControl.BigMap <= 0`. Opening a map not in cache sends `C.RequestMapInfo`; `S.NewMapInfo` / `S.WorldMapSetupInfo` / `S.SearchMapResult` feed NPC rows and the world overlay (`Prguse2` / `MapLinkIcon`).
+
+Client.Linux opens IRenderer chrome via `--input-script BigMap` / `BigMap:on` / `BigMap:off` / windowed B. Draw uses MapReader size + `MMap.Lib` frames (case-insensitive `DataPath`) when `--data` has the file — no invented tiles. `C.RequestMapInfo` is sent on open. World-map overlay / `SearchMap` / `TeleportToNPC` stay leftover (those sheets are catalog-missing).
+
+**Hard-gate** `--connect --headless` (dialog closed, no `--data`): **EXIT:0** — `BigMapOk=False` draws=0.
+
+**Smoke** `--input-script BigMap` + `--data` (`init-sample` or operator pack): **EXIT:0** — `BigMapOk=True` draws≥1.
+
 ### Version hash (2026-09-10, same VM)
 
 WinForms `LoginScene.SendVersion` MD5s `Application.ExecutablePath`. Server `Settings.LoadVersion` MD5s each `VersionPath` file (default `.\Mir2.Exe`) and `MirConnection.ClientVersion` compares `C.ClientVersion.VersionHash` when `CheckVersion` is true.
@@ -651,6 +661,7 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **WebView2** — Windows-only (WinForms Evergreen; no Linux runtime). Permanently deferred on Linux. `Client.Linux` must never reference it.
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
 - [x] **`MMap.Lib` / MagIcon / MagIcon2 tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Linux open is case-insensitive. MagIcon2 is the skill-book sheet (`MagicButton` / `AssignKeyPanel`). `--input-script Mag` / `MagTarget` send `C.Magic`. Skip when absent (`MagIcon2Ok=False`). Leftover: no WinForms skill-book keybind panel / full targeting cursor. Operator Data stays outside git.
+- [x] **Big-map dialog** — IRenderer chrome toggled by `--input-script BigMap` / windowed B (`KeybindOptions.Bigmap`). MapReader size + `MMap.Lib` at `MapInformation.BigMap` when `--data` has the file. `C.RequestMapInfo` on open. Skip draw when closed (`BigMapOk=False`). Leftover: world-map overlay (`Prguse2` / `MapLinkIcon`), `SearchMap` chrome, `TeleportToNPC`.
 - [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [x] **Version hash** — same MD5-of-file as WinForms `LoginScene.SendVersion` / `Settings.LoadVersion`. Server `--version-path` / `CRYSTAL_VERSION_PATH` (file or `.md5` / `.hashes` list) + Client `--version-file` / `CRYSTAL_VERSION_FILE` (default: this host's `Crystal.Client.Linux.dll`). `--no-version-check` remains an opt-out. Do not vendor `Mir2.Exe`. Leftover: a Windows server that only lists `Mir2.Exe` needs the operator to add the Linux client hash or point Linux `--version-file` at that exe.

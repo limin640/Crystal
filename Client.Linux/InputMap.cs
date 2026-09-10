@@ -260,6 +260,20 @@ internal static class InputMap
             return true;
         }
 
+        if (t.Equals("BigMap", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("BigMap:", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("FieldMap", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("WorldMap", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("B", StringComparison.OrdinalIgnoreCase))
+        {
+            string mode = "";
+            int colon = t.IndexOf(':');
+            if (colon >= 0 && colon + 1 < t.Length)
+                mode = t[(colon + 1)..].Trim();
+            command = GameCommand.BigMap(mode);
+            return true;
+        }
+
         if (t.Equals("Talk", StringComparison.OrdinalIgnoreCase)
             || t.Equals("NPC", StringComparison.OrdinalIgnoreCase)
             || t.Equals("Npc", StringComparison.OrdinalIgnoreCase))

@@ -100,6 +100,15 @@ internal sealed class CrystalSession : IDisposable
     public int MapWidth { get; private set; }
     public int MapHeight { get; private set; }
     public ushort MiniMapIndex { get; private set; }
+    public ushort BigMapIndex { get; private set; }
+    public bool BigMapOpen { get; private set; }
+    public int InputBigMaps { get; private set; }
+    public bool BigMapOk { get; private set; }
+    public bool BigMapMmapDrawn { get; private set; }
+    public int BigMapDraws { get; private set; }
+    public int BigMapBlips { get; private set; }
+    public string? BigMapEvidence { get; private set; }
+    public int MapInfoNpcCount { get; private set; }
     public bool ChatComposing { get; private set; }
     public string ChatDraft { get; private set; } = "";
     string _lastSentChat = "";
@@ -295,6 +304,9 @@ internal sealed class CrystalSession : IDisposable
             case GameCommandKind.MagTarget:
                 TryMagic(command.Text, command.Dest, lockOn: true);
                 break;
+            case GameCommandKind.BigMap:
+                TryBigMap(command.Text);
+                break;
         }
     }
 
@@ -316,7 +328,7 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} quests={InputQuests} mags={InputMags} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} QuestAcceptOk={QuestAcceptOk} QuestFinishOk={QuestFinishOk} MagicOk={MagicOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} quests={InputQuests} mags={InputMags} bigmaps={InputBigMaps} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} QuestAcceptOk={QuestAcceptOk} QuestFinishOk={QuestFinishOk} MagicOk={MagicOk} BigMapOpen={BigMapOpen} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
         if (BuyEvidence != null) Console.WriteLine($"  buy : {BuyEvidence}");
         if (SellEvidence != null) Console.WriteLine($"  sell : {SellEvidence}");
         if (TradeEvidence != null) Console.WriteLine($"  trade : {TradeEvidence}");
@@ -325,6 +337,7 @@ internal sealed class CrystalSession : IDisposable
         if (QuestAcceptEvidence != null) Console.WriteLine($"  quest-accept : {QuestAcceptEvidence}");
         if (QuestFinishEvidence != null) Console.WriteLine($"  quest-finish : {QuestFinishEvidence}");
         if (MagicEvidence != null) Console.WriteLine($"  mag : {MagicEvidence}");
+        if (BigMapEvidence != null) Console.WriteLine($"  bigmap : {BigMapEvidence}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
@@ -351,6 +364,11 @@ internal sealed class CrystalSession : IDisposable
         if (wantQuestAccept && !QuestAcceptOk) return 10;
         if (wantQuestFinish && !QuestFinishOk) return 10;
         if (wantMag && InputMags == 0) return 10;
+        bool wantBigMap = commands.Any(c => c.Kind == GameCommandKind.BigMap);
+        if (wantBigMap && InputBigMaps == 0) return 10;
+        bool wantBigMapOpen = commands.Any(c => c.Kind == GameCommandKind.BigMap && !IsBigMapClose(c.Text));
+        bool wantBigMapClose = commands.Any(c => c.Kind == GameCommandKind.BigMap && IsBigMapClose(c.Text));
+        if (wantBigMapOpen && !wantBigMapClose && !BigMapOpen) return 10;
         return 0;
     }
 
@@ -773,6 +791,44 @@ internal sealed class CrystalSession : IDisposable
         Pump(600);
     }
 
+    /// <summary>Same toggle as WinForms <c>BigMapDialog</c> / <c>KeybindOptions.Bigmap</c> (B). Sends <c>C.RequestMapInfo</c> when opening.</summary>
+    void TryBigMap(string mode)
+    {
+        InputBigMaps++;
+        bool open = mode.Trim().ToLowerInvariant() switch
+        {
+            "off" or "close" or "hide" => false,
+            "on" or "open" or "show" => true,
+            _ => !BigMapOpen
+        };
+        BigMapOpen = open;
+        if (open && MapIndex > 0)
+        {
+            Send(new C.RequestMapInfo { MapIndex = MapIndex });
+            Pump(400);
+        }
+        else
+            Pump(200);
+        BigMapEvidence = $"open={BigMapOpen} map={MapIndex} big={BigMapIndex} mini={MiniMapIndex} size={MapWidth}x{MapHeight} npcs={MapInfoNpcCount}";
+        Note($"input BigMap {BigMapEvidence} #{InputBigMaps}");
+    }
+
+    static bool IsBigMapClose(string mode)
+    {
+        string m = (mode ?? "").Trim().ToLowerInvariant();
+        return m is "off" or "close" or "hide";
+    }
+
+    public void MarkBigMapDraw(int draws, int blips, bool mmapTile)
+    {
+        BigMapDraws = draws;
+        BigMapBlips = blips;
+        BigMapMmapDrawn = mmapTile;
+        BigMapOk = BigMapOpen && draws > 0;
+        if (BigMapOpen)
+            BigMapEvidence = $"open={BigMapOpen} BigMapOk={BigMapOk} draws={draws} blips={blips} mmap={mmapTile} big={BigMapIndex} mini={MiniMapIndex} size={MapWidth}x{MapHeight} src=MMap.Lib";
+    }
+
     int FirstAcceptableQuestId()
     {
         foreach (var info in _questInfo.Values.OrderBy(q => q.Index))
@@ -1151,8 +1207,34 @@ internal sealed class CrystalSession : IDisposable
                 MapFileName = map.FileName;
                 MapTitle = map.Title;
                 MiniMapIndex = map.MiniMap;
+                BigMapIndex = map.BigMap;
                 InMap = true;
-                Note($"in-map: MapInformation index={map.MapIndex} file={map.FileName} title={map.Title} lights={map.Lights} minimapLib={map.MiniMap} (MMap.Lib via --data / catalog when present)");
+                Note($"in-map: MapInformation index={map.MapIndex} file={map.FileName} title={map.Title} lights={map.Lights} minimapLib={map.MiniMap} bigmapLib={map.BigMap} (MMap.Lib via --data / catalog when present)");
+                break;
+            case S.MapChanged mc:
+                MapIndex = mc.MapIndex;
+                MapFileName = mc.FileName;
+                MapTitle = mc.Title;
+                MiniMapIndex = mc.MiniMap;
+                BigMapIndex = mc.BigMap;
+                UserLocation = mc.Location;
+                Facing = mc.Direction;
+                InMap = true;
+                Note($"MapChanged index={mc.MapIndex} file={mc.FileName} title={mc.Title} mini={mc.MiniMap} big={mc.BigMap} loc={mc.Location.X},{mc.Location.Y}");
+                break;
+            case S.NewMapInfo nmi when nmi.Info != null:
+                if (nmi.Info.Width > 0) MapWidth = nmi.Info.Width;
+                if (nmi.Info.Height > 0) MapHeight = nmi.Info.Height;
+                if (nmi.Info.BigMap > 0) BigMapIndex = (ushort)nmi.Info.BigMap;
+                if (!string.IsNullOrWhiteSpace(nmi.Info.Title)) MapTitle = nmi.Info.Title;
+                MapInfoNpcCount = nmi.Info.NPCs?.Count ?? 0;
+                Note($"NewMapInfo index={nmi.MapIndex} title={nmi.Info.Title} size={nmi.Info.Width}x{nmi.Info.Height} big={nmi.Info.BigMap} npcs={MapInfoNpcCount} moves={nmi.Info.Movements?.Count ?? 0}");
+                break;
+            case S.WorldMapSetupInfo wms:
+                Note($"WorldMapSetup enabled={wms.Setup?.Enabled == true} icons={wms.Setup?.Icons?.Count ?? 0} teleportCost={wms.TeleportToNPCCost} (Prguse2/MapLinkIcon overlay leftover)");
+                break;
+            case S.SearchMapResult smr:
+                Note($"SearchMapResult map={smr.MapIndex} npc={smr.NPCIndex}");
                 break;
             case S.UserInformation user:
                 UserObjectId = user.ObjectID;
