@@ -3,7 +3,7 @@ using Silk.NET.OpenAL;
 
 namespace Crystal.Audio.Backends;
 
-/// <summary>Silk.NET OpenAL (OpenAL Soft on Linux). Windows Client still uses NAudio.</summary>
+/// <summary>Silk.NET OpenAL (OpenAL Soft on Linux). Windows Client uses NAudioAudio via SoundManager.</summary>
 public sealed class OpenALAudio : IAudio
 {
     public AudioBackendKind Kind => AudioBackendKind.OpenAL;

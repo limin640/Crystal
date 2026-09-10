@@ -168,7 +168,7 @@ This is StartGame / in-map evidence, **not** fight/loot/equip parity. Login hand
 dotnet build Client\Client.csproj -c Release
 ```
 
-Needs Windows + SlimDX (`Components\SlimDX.dll`). Will **not** compile on Linux (`net8.0-windows7.0`, WinForms, SlimDX). SlimDX remains the Windows `IRenderer` backend. GameScene floor/light RTs, control textures, CMain present, and particles go through `IRenderer` / `System.Numerics.Vector2`.
+Needs Windows + SlimDX (`Components\SlimDX.dll`). Will **not** compile on Linux (`net8.0-windows7.0`, WinForms, SlimDX, WebView2) — this VM reports `NETSDK1100` without a Windows targeting pack. SlimDX remains the Windows `IRenderer` backend. `SoundManager` calls `Crystal.Audio.IAudio` (`NAudioAudio`); NAudio is referenced from `Crystal.Audio`, not from `Client.csproj`. GameScene floor/light RTs, control textures, CMain present, and particles go through `IRenderer` / `System.Numerics.Vector2`.
 
 ## Solution
 

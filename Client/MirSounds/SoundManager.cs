@@ -1,23 +1,18 @@
-﻿using Client.MirSounds.Libraries;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
+﻿using Crystal.Audio;
 
 namespace Client.MirSounds
 {
     /// <summary>
-    /// Windows NAudio host (WaveOutEvent). Linux uses Crystal.Audio IAudio (Silk.NET OpenAL / Null).
-    /// Do not rewrite this graph on Linux; Client.Linux never references NAudio.
+    /// Windows GameScene-facing sound index API. Device playback goes through
+    /// <see cref="IAudio"/> (NAudio backend). Client.Linux uses Null / OpenAL
+    /// via <see cref="AudioFactory.Create"/> and never references this type.
     /// </summary>
     public static class SoundManager
     {
         private static Dictionary<int, string> _indexList => SoundList.Indexes;
         private static List<KeyValuePair<long, int>> _delayList = new List<KeyValuePair<long, int>>();
-        private static Dictionary<int, CachedSound> _cachedOneShots = new Dictionary<int, CachedSound>();
-
-        private static Dictionary<int, LoopProvider> _loopingSounds = new Dictionary<int, LoopProvider>();
-        private static LoopProvider _music;
-        private static WaveOutEvent _OneShots;
-        private static MixingSampleProvider mixer;
+        private static IAudio _device;
+        private static readonly MusicFacade _music = new MusicFacade();
 
         private static int _vol;
         private static int _musicVol;
@@ -25,7 +20,8 @@ namespace Client.MirSounds
         public static readonly List<string> SupportedFileTypes;
         private static long _checkSoundTime;
         public static ISoundLibrary Music => _music;
-        
+        public static IAudio Device => _device;
+
         public static int Vol
         {
             get { return _vol; }
@@ -33,8 +29,7 @@ namespace Client.MirSounds
             {
                 if (_vol == value) return;
                 _vol = value;
-
-                AdjustAllVolumes();
+                _device?.SetSfxVolume(ScaleVolume(_vol));
             }
         }
 
@@ -45,8 +40,7 @@ namespace Client.MirSounds
             {
                 if (_musicVol == value) return;
                 _musicVol = value;
-
-                _music?.SetVolume(MusicVol);
+                _device?.SetMusicVolume(ScaleVolume(_musicVol));
             }
         }
 
@@ -65,15 +59,16 @@ namespace Client.MirSounds
 
         public static void Create()
         {
-            int sampleRate = 44100;
-            int channelCount = 2;
+            _device?.Dispose();
+            _device = AudioFactory.CreateNAudio();
+            _device.SetSfxVolume(ScaleVolume(_vol));
+            _device.SetMusicVolume(ScaleVolume(_musicVol));
+        }
 
-            _OneShots = new WaveOutEvent();
-            mixer = new MixingSampleProvider(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channelCount));
-            mixer.ReadFully = true;
-            _OneShots.Init(mixer);
-            _OneShots.Volume = ScaleVolume(_vol);
-            _OneShots.Play();
+        static void EnsureDevice()
+        {
+            if (_device == null)
+                Create();
         }
 
         public static void PlaySound(int index, bool loop = false, int delay = 0)
@@ -95,54 +90,38 @@ namespace Client.MirSounds
                 _indexList.Add(index, filename);
             }
 
-            if (!loop)
-            {
-                if (!_cachedOneShots.TryGetValue(index, out CachedSound cachedSound))
-                {
-                    cachedSound = new CachedSound(index, _indexList[index]);
-                    _cachedOneShots.Add(index, cachedSound);
-                }
+            string path = ResolveSoundPath(_indexList[index]);
+            if (path == null) return;
 
-                if (cachedSound.AudioData?.Length > 0)
-                {
-                    AddMixerInput(new OneShotProvider(cachedSound));
-                    cachedSound.ExpireTime = CMain.Time + Settings.SoundCleanMinutes * 60 * 1000;
-                }
-            }
+            EnsureDevice();
+            if (!loop)
+                _device.PlayOneShot(path);
             else
-            {
-                var sound = LoopProvider.TryCreate(index, _indexList[index], MusicVol, loop);
-                if (sound != null)
-                {
-                    _loopingSounds.Add(index, sound);
-                    _loopingSounds[index].Play(Vol);
-                }
-            }
-            
+                _device.PlayLoop(index, path, ScaleVolume(Vol));
         }
 
         public static void StopSound(int index)
         {
-            if (_loopingSounds.ContainsKey(index))
-            {
-                _loopingSounds[index].Stop();
-            }
+            _device?.StopLoop(index);
         }
 
         public static void PlayMusic(int index, bool loop = false)
         {
             StopMusic();
 
-            if (_indexList.TryGetValue(index, out string value))
-            {
-                _music = LoopProvider.TryCreate(index, value, MusicVol, loop);
-            }
+            if (!_indexList.TryGetValue(index, out string value))
+                return;
+
+            string path = ResolveSoundPath(value);
+            if (path == null) return;
+
+            EnsureDevice();
+            _device.PlayMusic(path, loop, ScaleVolume(MusicVol));
         }
 
         public static void StopMusic()
         {
-            _music?.Stop();
-            _music?.Dispose();
+            _device?.StopMusic();
         }
 
         public static void ProcessDelayedSounds()
@@ -159,17 +138,23 @@ namespace Client.MirSounds
             }
         }
 
-        private static void AdjustAllVolumes()
+        private static string ResolveSoundPath(string fileName)
         {
-            if (_OneShots != null)
+            string path = Path.Combine(Settings.SoundPath, fileName);
+            string fileType = Path.GetExtension(path);
+
+            if (string.IsNullOrEmpty(fileType))
             {
-                _OneShots.Volume = ScaleVolume(Vol);
+                foreach (string ext in SupportedFileTypes)
+                {
+                    if (File.Exists(path + ext))
+                        return path + ext;
+                }
+
+                return null;
             }
 
-            foreach (int key in _loopingSounds.Keys)
-            {
-                _loopingSounds[key].SetVolume(Vol);
-            }
+            return File.Exists(path) ? path : null;
         }
 
         private static float ScaleVolume(int volume)
@@ -178,60 +163,38 @@ namespace Client.MirSounds
             return scaled;
         }
 
-        private static void AddMixerInput(ISampleProvider input)
-        {
-            mixer.AddMixerInput(ConvertToRightChannelCount(input));
-        }
-
-        private static ISampleProvider ConvertToRightChannelCount(ISampleProvider input)
-        {
-            if (input.WaveFormat.Channels == mixer.WaveFormat.Channels)
-            {
-                return input;
-            }
-            if (input.WaveFormat.Channels == 1 && mixer.WaveFormat.Channels == 2)
-            {
-                return new MonoToStereoSampleProvider(input);
-            }
-            throw new NotImplementedException("Not yet implemented this channel count conversion");
-        }
-
         private static void CheckSoundTimeOut()
         {
             if (CMain.Time >= _checkSoundTime)
             {
                 _checkSoundTime = CMain.Time + 30 * 1000;
-
-                List<int> keysToRemove = new List<int>();
-                foreach (var key in _cachedOneShots.Keys)
-                {
-                    if (CMain.Time > _cachedOneShots[key].ExpireTime)
-                    {
-                        keysToRemove.Add(key);
-                    }
-                }
-
-                keysToRemove.ForEach(key => { _cachedOneShots.Remove(key); });
-                
-                keysToRemove.Clear();
-                foreach(var key in _loopingSounds.Keys)
-                {
-                    if (CMain.Time > _loopingSounds[key].ExpireTime)
-                    {
-                        keysToRemove.Add(key);
-                    }
-                }
-
-                keysToRemove.ForEach(key => { _loopingSounds.Remove(key); });
+                _device?.PumpExpired(CMain.Time, Settings.SoundCleanMinutes * 60L * 1000);
             }
         }
 
         public static void Dispose()
         {
-            _OneShots?.Dispose();
-            _music?.Dispose();
+            _device?.Dispose();
+            _device = null;
+        }
 
-            foreach (var sound in _loopingSounds.Values) { sound.Stop(); }
+        sealed class MusicFacade : ISoundLibrary
+        {
+            public int Index { get; set; }
+            public long ExpireTime { get; set; }
+
+            public bool IsPlaying() => false;
+
+            public void Play(int volume)
+            {
+                _ = volume;
+            }
+
+            public void Stop() => StopMusic();
+
+            public void SetVolume(int vol) => MusicVol = vol;
+
+            public void Dispose() => StopMusic();
         }
     }
 }

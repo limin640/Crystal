@@ -219,7 +219,11 @@ sound: backend=Null (headless) SoundPlayOk=False skipped=headless
 FightHit=True LootOk=True EquipOk=True
 ```
 
-Windows `SoundManager` stays NAudio. WebView2 is Windows-only (permanently deferred on Linux).
+Windows `SoundManager` calls through `IAudio` (`NAudioAudio`). WebView2 is Windows-only (permanently deferred on Linux).
+
+## Windows SoundManager → IAudio (later)
+
+`SoundManager.Create()` → `AudioFactory.CreateNAudio()`. Linux PlayGate unchanged (`AudioFactory.Create`). Windows `Client.csproj` build command: `dotnet build Client\Client.csproj -c Release` (this VM: `NETSDK1100`). Evidence for Linux `--play-sound` / hard-gate is recorded after the agent run.
 
 ## Catalog 86 / deferred
 

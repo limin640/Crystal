@@ -2,7 +2,7 @@
 
 ## Sequencing toward the hard done gate
 
-Hard-gate **verbs** (login → select → walk → fight → loot → equip) are evidenced on Linux vs `Server.Linux` + Shared packets. Silk.NET input + a minimum IRenderer HUD are **in progress**. Full WinForms `GameScene` and WebView2 remain deferred. Audio is `IAudio` (OpenAL / Null). Language rewrite remains deferred.
+Hard-gate **verbs** (login → select → walk → fight → loot → equip) are evidenced on Linux vs `Server.Linux` + Shared packets. Silk.NET input + a minimum IRenderer HUD are **in progress**. Full WinForms `GameScene` and WebView2 remain deferred. Audio is `IAudio` (OpenAL / Null / NAudio). Language rewrite remains deferred.
 
 This PR lands the bake/renderer levers **and** the Linux verb path. It does not vendor Data, Jev, or bake atlases.
 
@@ -204,7 +204,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Mini-map WIL (`MMap.Lib`) / big map | Stub — no invented map art |
 | CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
-| **Audio** | **In progress** — `Crystal.Audio` `IAudio`: Null (headless), Silk.NET OpenAL on Linux, NAudio stays in Windows `SoundManager`. `--play-sound` / `--sound` / `CRYSTAL_SOUND`. Fixture `Tools/Crystal.Audio/fixtures/tone.wav` (not game art). Do not vendor the Sound pack |
+| **Audio** | **In progress** — `Crystal.Audio` `IAudio`: Null (headless), Silk.NET OpenAL on Linux, **NAudio backend** on Windows. `SoundManager` is the GameScene index API and calls through `IAudio` (`AudioFactory.CreateNAudio()`). `--play-sound` / `--sound` / `CRYSTAL_SOUND`. Fixture `Tools/Crystal.Audio/fixtures/tone.wav` (not game art). Do not vendor the Sound pack |
 | **WebView2** | Windows-only, permanently deferred on Linux. `Client.Linux` never references it; a no-op browser stub is unnecessary |
 
 ```bash
@@ -448,7 +448,7 @@ hud-drag ghost=0 from=-1 to=-1
 
 ### Linux audio — IAudio / OpenAL (2026-09-09, same VM)
 
-`Crystal.Audio` mirrors `IRenderer`: Null on `--headless` (no device), Silk.NET OpenAL on `--play-sound`. Windows `SoundManager` stays NAudio. No Sound pack on this VM; fixture `Tools/Crystal.Audio/fixtures/tone.wav` (generated sine, not game art). Operator packs: `--sound` / `CRYSTAL_SOUND`. OpenAL Soft uses the `null` output when no card (`alsoft-headless.conf` / `ALSOFT_DRIVERS=null`).
+`Crystal.Audio` mirrors `IRenderer`: Null on `--headless` (no device), Silk.NET OpenAL on `--play-sound`, NAudio `WaveOutEvent` on Windows (`SoundManager` → `IAudio`). No Sound pack on this VM; fixture `Tools/Crystal.Audio/fixtures/tone.wav` (generated sine, not game art). Operator packs: `--sound` / `CRYSTAL_SOUND`. OpenAL Soft uses the `null` output when no card (`alsoft-headless.conf` / `ALSOFT_DRIVERS=null`).
 
 **Play** `--headless --play-sound`: **EXIT:0**
 
@@ -468,6 +468,20 @@ sound: backend=Null (headless) SoundPlayOk=False skipped=headless
 
 WebView2 stays Windows-only (no Linux stub). WIL item icons stay pack-missing (catalog 86).
 
+### Windows SoundManager → IAudio (2026-09-10)
+
+`Client/MirSounds/SoundManager.cs` is a GameScene-facing index facade (`PlaySound(int)`, `SoundList`, `Settings.SoundPath`). Device I/O is `Crystal.Audio.IAudio` via `AudioFactory.CreateNAudio()` → `NAudioAudio` (WaveOutEvent + mixer, wav/mp3). Linux PlayGate still uses `AudioFactory.Create(headless, play)` (Null / OpenAL) and never constructs NAudio.
+
+**Windows build** (operator box; SlimDX + WinForms):
+
+```bat
+dotnet build Client\Client.csproj -c Release
+```
+
+This Linux VM: `NETSDK1100` (`net8.0-windows7.0` needs `EnableWindowsTargeting` + a Windows pack). `Crystal.Audio` (includes NAudio backend) and `Client.Linux` **do** build here.
+
+**Linux evidence** (same VM): `--play-sound` OpenAL + `--connect --headless` Null / PlayGate — see next evidence block after the run.
+
 ## Remaining residuals (checklist)
 
 These do **not** block the hard-gate (login→select→walk→fight→loot→equip **EXIT:0**). Do not invent WIL/game art to close them.
@@ -477,7 +491,7 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
 - [ ] **`MMap.Lib` / MagIcon tiles** — mini-map stays geometry; skill bar stays 8 stubs. No invented map or spell art.
 - [ ] **Quest accept / turn-in UI** — names from `S.NewQuestInfo` only; no `C.AcceptQuest` / complete flow.
-- [ ] **Windows `SoundManager` → `IAudio` fold** — Linux already uses Null / OpenAL. NAudio stays on the Windows client until GameScene lands.
+- [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [ ] **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 - [ ] **Operator art / Data / Jev / Sound packs** — stay outside git. `--data` / `--maps` / `--sound` / `--root` point at external trees. Do not vendor bake atlases.
 
