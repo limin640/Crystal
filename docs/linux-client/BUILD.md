@@ -147,12 +147,12 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--connect` | Shared `Packet` session (Connected → version → account → select → StartGame) |
 | `--login-only` | Stop after `LoginSuccess` (no NewCharacter / StartGame) |
 | `--maps <dir>` | External Jev `Maps/` for `.map` load (`CRYSTAL_MAPS`). Not vendored. |
-| `--data <dir>` | Optional client Data tree (`CRYSTAL_DATA`). `MapView` floor `.Lib` plus `MMap.Lib` / `MagIcon.Lib` HUD tiles via `MLibParser`. Linux open is case-insensitive (`mmap.Lib` = `MMap.Lib`). Missing files skip. Do not vendor the pack. Operator: the folder that contains `MMap.Lib` / `mmap.Lib` (same as WinForms `Settings.DataPath`). Smoke: `crystal-bake init-sample /tmp/crystal-mmap-sample` |
+| `--data <dir>` | Optional client Data tree (`CRYSTAL_DATA`). `MapView` floor `.Lib` plus `MMap.Lib` / `MagIcon.Lib` / `MagIcon2.Lib` HUD tiles via `MLibParser`. Linux open is case-insensitive. Missing files skip. Do not vendor the pack. |
 | `--catalog` | Bake atlas catalog (fixture or operator bake-out) |
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |
 | `--no-gate` | Stop after walk (skip scripted Attack / PickUp / EquipItem) |
-| `--input-script` | After StartGame, inject Crystal keys. `QuestAccept` / `QuestAccept:id` → `C.AcceptQuest`; `QuestFinish` / `QuestFinish:id` → `C.FinishQuest` (same packets as `QuestListDialog`). `Drag` / `Drag:0,8` → `C.MoveItem`; `Merge:0,1` → `C.MergeItem`. Map teleport stays `Move:x:y` (`@MOVE`). |
+| `--input-script` | After StartGame, inject Crystal keys. `Mag` / `Mag:Fencing` / `MagTarget` / `MagTarget:id` → `C.Magic` (`SpellTargetLock` on MagTarget). `QuestAccept` / `QuestFinish` → quest packets. `Drag` / `Merge` → bag move. Map teleport stays `Move:x:y` (`@MOVE`). |
 | `--auto-trade-reply` | On `S.TradeRequest`, send `C.TradeReply` `AcceptInvite=true` |
 | `--auto-trade-confirm` | On `S.TradeGold` / `S.TradeItem`, send `C.TradeConfirm` `Locked=true` |
 | `--keep-alive <ms>` | Pump after the input script so a second client can finish the trade |

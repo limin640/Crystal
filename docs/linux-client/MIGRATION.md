@@ -200,7 +200,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Player trade | **In progress** — two Client.Linux processes (`docs/linux-client/trade-two-process.sh`). `C.ChangeTrade` / `C.TradeRequest` / `C.TradeReply` / `C.TradeGold` / `C.DepositTradeItem` / `C.TradeConfirm` + matching `S.*`. Players must face each other. |
 | Inventory bag move (`C.MoveItem` / `C.MergeItem`) | **In progress** — `--input-script Drag:0,8` / `Merge:from,to`; HUD slot refresh. Same packets as `MirItemCell` |
 | Mouse-drag chrome (SelectedCell ghost / click-to-drop) | **In progress** — IRenderer colored-quad ghost + source/dest highlight on `Drag`. Windowed left-click pick/drop on bag/belt if Silk.NET mouse coords exist. Headless keeps `Drag:from,to` tokens. **No WIL item icons** |
-| Magic targeting / skill icons (`MagIcon`) | **In progress** — `MagIcon.Lib` (fallback `MagIcon2.Lib`) through `MLibParser` + `IRenderer` when `--data` has the file. Targeting / MagIcon2 skill-book still stub |
+| Magic targeting / skill icons (`MagIcon` / `MagIcon2`) | **In progress** — both libs via `DataPath` + `IRenderer` when `--data` has them. Skill-book chrome uses `MagIcon2` at `Icon * 2` (WinForms `MagicButton`). `--input-script Mag` / `MagTarget` → `C.Magic` (`SpellTargetLock` on MagTarget). Warrior with no learned spell still sends; `S.Magic` is optional |
 | Mini-map WIL (`MMap.Lib`) / big map | **In progress** — `MMap.Lib` when `--data` has the file; skip when absent (no invented map art). Big-map dialog still stub |
 | CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
@@ -566,6 +566,14 @@ hud-lib MagIcon file=MagIcon.Lib ok=True images=4 src=/tmp/crystal-mmap-case/mag
 hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapSrc=/tmp/crystal-mmap-case/mmap.Lib magSrc=/tmp/crystal-mmap-case/magicon.Lib
 ```
 
+### MagIcon2 skill-book / C.Magic (2026-09-10, same VM)
+
+WinForms `MagicButton` / `AssignKeyPanel` use `Libraries.MagIcon2` at `magic.Icon * 2`. Client.Linux binds `MagIcon2.Lib` independently (case-insensitive `DataPath`) and draws a BOOK stub. `--input-script Mag` / `MagTarget[:id|:Spell]` send Shared `C.Magic` (`SpellTargetLock` on MagTarget). `S.Magic` / `S.MagicCast` are logged when the character knows the spell (starter Warrior often has none).
+
+**Hard-gate** (no `--data`): **EXIT:0** — `MagIcon2Ok=False` mag2Draws=0.
+
+**Smoke** `init-sample` `--data` (includes `MagIcon2.Lib`): **EXIT:0** — `MagIcon2Ok=True` mag2Draws≥1.
+
 ### Version hash (2026-09-10, same VM)
 
 WinForms `LoginScene.SendVersion` MD5s `Application.ExecutablePath`. Server `Settings.LoadVersion` MD5s each `VersionPath` file (default `.\Mir2.Exe`) and `MirConnection.ClientVersion` compares `C.ClientVersion.VersionHash` when `CheckVersion` is true.
@@ -606,7 +614,7 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **Full WinForms `GameScene`** — Client.Linux is Shared packets + `MapView` + IRenderer HUD, not a language rewrite of the scene graph / dialogs.
 - [ ] **WebView2** — Windows-only (WinForms Evergreen; no Linux runtime). Permanently deferred on Linux. `Client.Linux` must never reference it.
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
-- [x] **`MMap.Lib` / MagIcon tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Linux open is case-insensitive (`mmap.Lib` matches `MMap.Lib`; no symlink). Skip when absent (`MMapOk=False`). Leftover: no big-map dialog, no MagIcon2 skill-book / targeting, no invented tiles. Operator Data stays outside git.
+- [x] **`MMap.Lib` / MagIcon / MagIcon2 tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Linux open is case-insensitive. MagIcon2 is the skill-book sheet (`MagicButton` / `AssignKeyPanel`). `--input-script Mag` / `MagTarget` send `C.Magic`. Skip when absent (`MagIcon2Ok=False`). Leftover: no WinForms skill-book keybind panel / full targeting cursor. Operator Data stays outside git.
 - [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [x] **Version hash** — same MD5-of-file as WinForms `LoginScene.SendVersion` / `Settings.LoadVersion`. Server `--version-path` / `CRYSTAL_VERSION_PATH` (file or `.md5` / `.hashes` list) + Client `--version-file` / `CRYSTAL_VERSION_FILE` (default: this host's `Crystal.Client.Linux.dll`). `--no-version-check` remains an opt-out. Do not vendor `Mir2.Exe`. Leftover: a Windows server that only lists `Mir2.Exe` needs the operator to add the Linux client hash or point Linux `--version-file` at that exe.

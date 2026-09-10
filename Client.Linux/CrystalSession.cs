@@ -115,6 +115,9 @@ internal sealed class CrystalSession : IDisposable
     readonly HashSet<int> _completedQuestIds = new();
     int _pendingAccept = -1;
     int _pendingFinish = -1;
+    public int InputMags { get; private set; }
+    public bool MagicOk { get; private set; }
+    public string? MagicEvidence { get; private set; }
     public int InputQuests { get; private set; }
     public bool QuestAcceptOk { get; private set; }
     public bool QuestFinishOk { get; private set; }
@@ -286,6 +289,12 @@ internal sealed class CrystalSession : IDisposable
             case GameCommandKind.QuestShare:
                 TryQuestShare(command.Slot);
                 break;
+            case GameCommandKind.Mag:
+                TryMagic(command.Text, command.Dest, lockOn: false);
+                break;
+            case GameCommandKind.MagTarget:
+                TryMagic(command.Text, command.Dest, lockOn: true);
+                break;
         }
     }
 
@@ -307,7 +316,7 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} quests={InputQuests} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} QuestAcceptOk={QuestAcceptOk} QuestFinishOk={QuestFinishOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} quests={InputQuests} mags={InputMags} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} QuestAcceptOk={QuestAcceptOk} QuestFinishOk={QuestFinishOk} MagicOk={MagicOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
         if (BuyEvidence != null) Console.WriteLine($"  buy : {BuyEvidence}");
         if (SellEvidence != null) Console.WriteLine($"  sell : {SellEvidence}");
         if (TradeEvidence != null) Console.WriteLine($"  trade : {TradeEvidence}");
@@ -315,6 +324,7 @@ internal sealed class CrystalSession : IDisposable
         if (MergeEvidence != null) Console.WriteLine($"  merge : {MergeEvidence}");
         if (QuestAcceptEvidence != null) Console.WriteLine($"  quest-accept : {QuestAcceptEvidence}");
         if (QuestFinishEvidence != null) Console.WriteLine($"  quest-finish : {QuestFinishEvidence}");
+        if (MagicEvidence != null) Console.WriteLine($"  mag : {MagicEvidence}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
@@ -327,6 +337,7 @@ internal sealed class CrystalSession : IDisposable
         bool wantMerge = commands.Any(c => c.Kind == GameCommandKind.Merge);
         bool wantQuestAccept = commands.Any(c => c.Kind == GameCommandKind.QuestAccept);
         bool wantQuestFinish = commands.Any(c => c.Kind == GameCommandKind.QuestFinish);
+        bool wantMag = commands.Any(c => c.Kind is GameCommandKind.Mag or GameCommandKind.MagTarget);
         if (wantWalk && InputWalks == 0) return 10;
         if (wantAtk && InputAttacks == 0) return 10;
         if (wantChat && ChatSent == 0) return 10;
@@ -339,6 +350,7 @@ internal sealed class CrystalSession : IDisposable
         if (wantMerge && !MergeOk) return 10;
         if (wantQuestAccept && !QuestAcceptOk) return 10;
         if (wantQuestFinish && !QuestFinishOk) return 10;
+        if (wantMag && InputMags == 0) return 10;
         return 0;
     }
 
@@ -710,6 +722,55 @@ internal sealed class CrystalSession : IDisposable
         Send(new C.ShareQuest { QuestIndex = questIndex });
         Note($"input ShareQuest id={questIndex} #{InputQuests}");
         Pump(400);
+    }
+
+    /// <summary>Same <c>C.Magic</c> as WinForms <c>GameScene</c> targeting (<c>SpellTargetLock</c> from MagTarget).</summary>
+    void TryMagic(string spellName, int targetId, bool lockOn)
+    {
+        Spell spell = Spell.Fencing;
+        if (!string.IsNullOrWhiteSpace(spellName))
+        {
+            if (Enum.TryParse(spellName, true, out Spell parsed))
+                spell = parsed;
+            else if (byte.TryParse(spellName, out byte code) && Enum.IsDefined(typeof(Spell), code))
+                spell = (Spell)code;
+            else
+            {
+                var named = _magics.FirstOrDefault(m => string.Equals(m.Name, spellName, StringComparison.OrdinalIgnoreCase));
+                if (named != null)
+                    spell = named.Spell;
+            }
+        }
+        else if (_magics.Count > 0)
+            spell = _magics[0].Spell;
+
+        uint tid = targetId > 0 ? (uint)targetId : 0;
+        var loc = UserLocation;
+        if (tid == 0)
+        {
+            var mob = _objects.Values.FirstOrDefault(o => o.Kind == "monster");
+            if (mob != null)
+            {
+                tid = mob.ObjectID;
+                loc = mob.Location;
+            }
+        }
+        else if (_objects.TryGetValue(tid, out var obj))
+            loc = obj.Location;
+
+        InputMags++;
+        Send(new C.Magic
+        {
+            ObjectID = UserObjectId,
+            Spell = spell,
+            Direction = Facing,
+            TargetID = tid,
+            Location = loc,
+            SpellTargetLock = lockOn
+        });
+        MagicEvidence = $"C.Magic spell={spell} target={tid} lock={lockOn} loc={loc.X},{loc.Y} known={_magics.Count}";
+        Note($"input Mag {MagicEvidence} #{InputMags}");
+        Pump(600);
     }
 
     int FirstAcceptableQuestId()
@@ -1456,6 +1517,14 @@ internal sealed class CrystalSession : IDisposable
             case S.NewMagic nm when nm.Magic != null && !nm.Hero:
                 _magics.Add(nm.Magic);
                 Note($"NewMagic {nm.Magic.Name} spell={nm.Magic.Spell} key={nm.Magic.Key} magics={_magics.Count}");
+                break;
+            case S.Magic sm:
+                MagicOk = sm.Cast || MagicOk;
+                MagicEvidence = $"S.Magic spell={sm.Spell} cast={sm.Cast} target={sm.TargetID} at={sm.Target.X},{sm.Target.Y}";
+                Note(MagicEvidence);
+                break;
+            case S.MagicCast mc:
+                Note($"S.MagicCast spell={mc.Spell}");
                 break;
             case S.MagicLeveled ml:
                 foreach (var mag in _magics)

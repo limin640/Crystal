@@ -78,6 +78,7 @@ internal sealed class SceneHud : IDisposable
         DrawMiniMap(width - 140, 52, 128, session, mapView);
         DrawBeltBar(width / 2 - 140, height - 118, session);
         DrawSkillBar(16, height - 118, session);
+        DrawSkillBook(312, height - 118, session);
         DrawChatLog(16, height - 176, session);
         DrawNpcPanel(270, 56, session);
 
@@ -106,7 +107,7 @@ internal sealed class SceneHud : IDisposable
     {
         Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} gold={session.UserGold} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
         Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex}");
-        Console.WriteLine($"hud mmap: MMapOk={_libs?.MMapOk ?? false} MagIconOk={_libs?.MagIconOk ?? false} mmapDraws={_libs?.MMapTileDraws ?? 0} magDraws={_libs?.MagIconTileDraws ?? 0} mmapIndex={_libs?.MMapDrawIndex ?? -1} magIndex={_libs?.MagIconDrawIndex ?? -1} mmapSrc={_libs?.MMapSource ?? "-"} magSrc={_libs?.MagIconSource ?? "-"} images={_libs?.MMapImages ?? 0}/{_libs?.MagIconImages ?? 0}");
+        Console.WriteLine($"hud mmap: MMapOk={_libs?.MMapOk ?? false} MagIconOk={_libs?.MagIconOk ?? false} MagIcon2Ok={_libs?.MagIcon2Ok ?? false} mmapDraws={_libs?.MMapTileDraws ?? 0} magDraws={_libs?.MagIconTileDraws ?? 0} mag2Draws={_libs?.MagIcon2TileDraws ?? 0} mmapIndex={_libs?.MMapDrawIndex ?? -1} magIndex={_libs?.MagIconDrawIndex ?? -1} mag2Index={_libs?.MagIcon2DrawIndex ?? -1} mmapSrc={_libs?.MMapSource ?? "-"} magSrc={_libs?.MagIconSource ?? "-"} mag2Src={_libs?.MagIcon2Source ?? "-"} images={_libs?.MMapImages ?? 0}/{_libs?.MagIconImages ?? 0}/{_libs?.MagIcon2Images ?? 0}");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
         Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count} gold={session.UserGold} bag={session.BagCount} buys={session.InputBuys} sells={session.InputSells} BuyOk={session.BuyOk} SellOk={session.SellOk}");
         Console.WriteLine($"hud quest: info={session.QuestCatalog.Count} taken={session.TakenQuests.Count} done={session.CompletedQuestIds.Count} accepts={session.InputQuests} AcceptOk={session.QuestAcceptOk} FinishOk={session.QuestFinishOk}");
@@ -436,6 +437,25 @@ internal sealed class SceneHud : IDisposable
             if (mag != null) SkillsFilled++;
         }
         SkillDraws = HudDraws - before;
+    }
+
+    /// <summary>WinForms skill-book uses <c>Libraries.MagIcon2</c> at <c>magic.Icon * 2</c>.</summary>
+    void DrawSkillBook(int x, int y, CrystalSession session)
+    {
+        const int n = 4;
+        Fill(x, y, n * 36 + 8, 36, Color.FromArgb(190, 20, 16, 28));
+        Text(x + 4, y + 2, "BOOK", Color.Thistle);
+        for (int i = 0; i < n; i++)
+        {
+            ClientMagic? mag = i < session.Magics.Count ? session.Magics[i] : null;
+            int cx = x + 6 + i * 36;
+            Fill(cx, y + 16, 32, 16, mag == null ? Color.FromArgb(150, 32, 28, 40) : Color.FromArgb(210, 80, 48, 96));
+            int icon = mag != null ? mag.Icon * 2 : (i == 0 ? 0 : -1);
+            if (icon >= 0)
+                _libs?.TryDrawMagIcon2(icon, cx + 16, y + 16, 16, 16);
+            string label = mag == null ? $"B{i + 1}" : Clip(string.IsNullOrWhiteSpace(mag.Name) ? mag.Spell.ToString() : mag.Name, 4);
+            Text(cx + 1, y + 17, label, mag == null ? Color.Gray : Color.White);
+        }
     }
 
     void DrawChatLog(int x, int y, CrystalSession session)

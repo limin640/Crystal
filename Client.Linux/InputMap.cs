@@ -240,6 +240,26 @@ internal static class InputMap
             return false;
         }
 
+        if (t.Equals("Mag", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Mag:", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("Magic", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Magic:", StringComparison.OrdinalIgnoreCase))
+        {
+            ParseMagArgs(t, out string spell, out int target);
+            command = GameCommand.Mag(spell, target);
+            return true;
+        }
+
+        if (t.Equals("MagTarget", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("MagTarget:", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("MagicTarget", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("MagicTarget:", StringComparison.OrdinalIgnoreCase))
+        {
+            ParseMagArgs(t, out string spell, out int target);
+            command = GameCommand.MagTarget(spell, target);
+            return true;
+        }
+
         if (t.Equals("Talk", StringComparison.OrdinalIgnoreCase)
             || t.Equals("NPC", StringComparison.OrdinalIgnoreCase)
             || t.Equals("Npc", StringComparison.OrdinalIgnoreCase))
@@ -292,6 +312,31 @@ internal static class InputMap
     /// <summary>WASD / arrows / numpad — same 8-way rose as Crystal MapControl + CMain.</summary>
     public static bool TryKeyWalk(string keyName, out MirDirection dir)
         => TryDirection(keyName, out dir);
+
+    /// <summary><c>Mag:Fencing</c>, <c>Mag:1</c>, <c>MagTarget:12345</c>, <c>MagTarget:Fencing,12345</c>.</summary>
+    static void ParseMagArgs(string token, out string spell, out int target)
+    {
+        spell = "";
+        target = 0;
+        int colon = token.IndexOf(':');
+        if (colon < 0 || colon + 1 >= token.Length)
+            return;
+        string[] parts = token[(colon + 1)..].Split(new[] { ',', ':' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+            return;
+
+        string first = parts[0].Trim();
+        if (Enum.TryParse<Spell>(first, true, out _)
+            || (byte.TryParse(first, out byte code) && Enum.IsDefined(typeof(Spell), code)))
+            spell = first;
+        else if (int.TryParse(first, out int tid))
+            target = tid;
+        else
+            spell = first;
+
+        if (parts.Length >= 2)
+            int.TryParse(parts[1].Trim(), out target);
+    }
 
     static bool TrySlotPair(string token, out int from, out int to)
     {

@@ -7,8 +7,9 @@ using Crystal.Graphics;
 namespace Client.Linux;
 
 /// <summary>
-/// Optional MMap.Lib / MagIcon.Lib tiles through <see cref="MLibParser"/> or a bake catalog.
+/// Optional MMap.Lib / MagIcon.Lib / MagIcon2.Lib tiles through <see cref="MLibParser"/> or a bake catalog.
 /// Missing files are skipped — no invented texels. Operator <c>--data</c> / <c>CRYSTAL_DATA</c>.
+/// MagIcon2 is the WinForms skill-book sheet (<c>MagicButton</c> / <c>AssignKeyPanel</c>).
 /// </summary>
 internal sealed class HudLibSheet : IDisposable
 {
@@ -20,14 +21,19 @@ internal sealed class HudLibSheet : IDisposable
 
     public bool MMapOk { get; private set; }
     public bool MagIconOk { get; private set; }
+    public bool MagIcon2Ok { get; private set; }
     public int MMapImages { get; private set; }
     public int MagIconImages { get; private set; }
+    public int MagIcon2Images { get; private set; }
     public string? MMapSource { get; private set; }
     public string? MagIconSource { get; private set; }
+    public string? MagIcon2Source { get; private set; }
     public int MMapTileDraws { get; private set; }
     public int MagIconTileDraws { get; private set; }
+    public int MagIcon2TileDraws { get; private set; }
     public int MMapDrawIndex { get; private set; } = -1;
     public int MagIconDrawIndex { get; private set; } = -1;
+    public int MagIcon2DrawIndex { get; private set; } = -1;
 
     public HudLibSheet(
         IRenderer renderer,
@@ -51,12 +57,11 @@ internal sealed class HudLibSheet : IDisposable
             }
         }
 
-        Bind("MMap.Lib", dataRoot, mmap: true);
-        Bind("MagIcon.Lib", dataRoot, mag: true);
-        if (!MagIconOk)
-            Bind("MagIcon2.Lib", dataRoot, mag: true);
+        Bind("MMap.Lib", dataRoot, BindKind.MMap);
+        Bind("MagIcon.Lib", dataRoot, BindKind.MagIcon);
+        Bind("MagIcon2.Lib", dataRoot, BindKind.MagIcon2);
 
-        Console.WriteLine($"hud-lib ready MMapOk={MMapOk} MagIconOk={MagIconOk} images={MMapImages}/{MagIconImages}");
+        Console.WriteLine($"hud-lib ready MMapOk={MMapOk} MagIconOk={MagIconOk} MagIcon2Ok={MagIcon2Ok} images={MMapImages}/{MagIconImages}/{MagIcon2Images}");
     }
 
     public bool TryDrawMMap(int preferredIndex, int x, int y, int w, int h)
@@ -83,34 +88,49 @@ internal sealed class HudLibSheet : IDisposable
     public bool TryDrawMagIcon(int preferredIndex, int x, int y, int w, int h)
     {
         if (!MagIconOk) return false;
-        string lib = _parsed.ContainsKey("MagIcon.Lib") || HasCatalog("MagIcon.Lib")
-            ? "MagIcon.Lib"
-            : "MagIcon2.Lib";
+        if (!TryDrawPreferred("MagIcon.Lib", preferredIndex, x, y, w, h, out int used))
+            return false;
+        MagIconTileDraws++;
+        MagIconDrawIndex = used;
+        return true;
+    }
+
+    public bool TryDrawMagIcon2(int preferredIndex, int x, int y, int w, int h)
+    {
+        if (!MagIcon2Ok) return false;
+        if (!TryDrawPreferred("MagIcon2.Lib", preferredIndex, x, y, w, h, out int used))
+            return false;
+        MagIcon2TileDraws++;
+        MagIcon2DrawIndex = used;
+        return true;
+    }
+
+    bool TryDrawPreferred(string lib, int preferredIndex, int x, int y, int w, int h, out int used)
+    {
+        used = -1;
         if (TryDraw(lib, preferredIndex, x, y, w, h))
         {
-            MagIconTileDraws++;
-            MagIconDrawIndex = preferredIndex;
+            used = preferredIndex;
             return true;
         }
 
         int first = FirstDecoded(lib);
         if (first >= 0 && TryDraw(lib, first, x, y, w, h))
         {
-            MagIconTileDraws++;
-            MagIconDrawIndex = first;
+            used = first;
             return true;
         }
 
         return false;
     }
 
-    void Bind(string fileName, string? dataRoot, bool mmap = false, bool mag = false)
+    void Bind(string fileName, string? dataRoot, BindKind kind)
     {
         bool fromCatalog = HasCatalog(fileName);
         if (fromCatalog)
         {
             int n = _catalogSprites.Keys.Count(k => string.Equals(k.Library, fileName, StringComparison.OrdinalIgnoreCase));
-            Mark(fileName, "catalog", n, mmap, mag);
+            Mark(fileName, "catalog", n, kind);
         }
 
         if (string.IsNullOrWhiteSpace(dataRoot))
@@ -141,27 +161,35 @@ internal sealed class HudLibSheet : IDisposable
         }
 
         _parsed[fileName] = parsed;
-        Mark(fileName, path, parsed.DecodedCount, mmap, mag);
+        Mark(fileName, path, parsed.DecodedCount, kind);
     }
 
-    void Mark(string fileName, string source, int images, bool mmap, bool mag)
+    void Mark(string fileName, string source, int images, BindKind kind)
     {
-        if (mmap)
+        bool ok = images > 0;
+        switch (kind)
         {
-            MMapOk = images > 0;
-            MMapImages = images;
-            MMapSource = source;
+            case BindKind.MMap:
+                MMapOk = ok;
+                MMapImages = images;
+                MMapSource = source;
+                break;
+            case BindKind.MagIcon:
+                MagIconOk = ok;
+                MagIconImages = images;
+                MagIconSource = source;
+                break;
+            case BindKind.MagIcon2:
+                MagIcon2Ok = ok;
+                MagIcon2Images = images;
+                MagIcon2Source = source;
+                break;
         }
 
-        if (mag)
-        {
-            MagIconOk = images > 0;
-            MagIconImages = images;
-            MagIconSource = source;
-        }
-
-        Console.WriteLine($"hud-lib {(mmap ? "MMap" : "MagIcon")} file={fileName} ok={(mmap ? MMapOk : MagIconOk)} images={images} src={source}");
+        Console.WriteLine($"hud-lib {kind} file={fileName} ok={ok} images={images} src={source}");
     }
+
+    enum BindKind { MMap, MagIcon, MagIcon2 }
 
     bool TryDraw(string library, int index, int x, int y, int w, int h)
     {

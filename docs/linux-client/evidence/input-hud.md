@@ -274,6 +274,14 @@ hud-lib MagIcon file=MagIcon.Lib ok=True src=/tmp/crystal-mmap-case/magicon.Lib
 hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1
 ```
 
+## MagIcon2 skill-book / C.Magic (later)
+
+Independent `MagIcon2.Lib` bind (WinForms skill-book). `--input-script Mag` / `MagTarget` → `C.Magic`.
+
+**Hard-gate** (no `--data`): **EXIT:0** — `MagIcon2Ok=False`.
+
+**Smoke** `--data` with `MagIcon2.Lib`: **EXIT:0** — `MagIcon2Ok=True` mag2Draws≥1.
+
 ## Version hash (later)
 
 Same MD5-of-file as WinForms. Server `--version-path` / Client `--version-file` (default `Crystal.Client.Linux.dll`). `--no-version-check` is opt-out. Do not vendor `Mir2.Exe`.

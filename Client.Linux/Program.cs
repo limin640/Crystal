@@ -168,7 +168,7 @@ internal static class Program
         if (session != null)
         {
             Console.WriteLine($"  version : VersionCheckOk={session.VersionCheckOk} Result={session.VersionResult?.ToString() ?? "-"} src={session.VersionHashSource ?? "-"} md5={session.VersionHashHex ?? "-"}");
-            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} drags={session.InputDrags} quests={session.InputQuests} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} DragOk={session.DragOk} QuestAcceptOk={session.QuestAcceptOk} QuestFinishOk={session.QuestFinishOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} drags={session.InputDrags} quests={session.InputQuests} mags={session.InputMags} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} DragOk={session.DragOk} QuestAcceptOk={session.QuestAcceptOk} QuestFinishOk={session.QuestFinishOk} MagicOk={session.MagicOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
             Console.WriteLine($"  items   : bag={session.BagCount} gold={session.UserGold} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
             if (session.BuyEvidence != null)
                 Console.WriteLine($"  buy     : {session.BuyEvidence}");
@@ -186,6 +186,8 @@ internal static class Program
                 Console.WriteLine($"  quest   : {session.QuestAcceptEvidence}");
             if (session.QuestFinishEvidence != null)
                 Console.WriteLine($"  quest   : {session.QuestFinishEvidence}");
+            if (session.MagicEvidence != null)
+                Console.WriteLine($"  mag     : {session.MagicEvidence}");
         }
         Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
         mapView?.Dispose();

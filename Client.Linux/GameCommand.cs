@@ -25,7 +25,9 @@ internal enum GameCommandKind
     QuestAccept,
     QuestFinish,
     QuestAbandon,
-    QuestShare
+    QuestShare,
+    Mag,
+    MagTarget
 }
 
 internal readonly struct GameCommand
@@ -58,4 +60,8 @@ internal readonly struct GameCommand
     public static GameCommand QuestFinish(int questIndex = -1, int selectedItem = -1) => new() { Kind = GameCommandKind.QuestFinish, Text = "", Slot = questIndex, Dest = selectedItem };
     public static GameCommand QuestAbandon(int questIndex) => new() { Kind = GameCommandKind.QuestAbandon, Text = "", Slot = questIndex };
     public static GameCommand QuestShare(int questIndex) => new() { Kind = GameCommandKind.QuestShare, Text = "", Slot = questIndex };
+    /// <summary><c>C.Magic</c> — optional spell name/id in <see cref="Text"/>, optional target ObjectID in <see cref="Dest"/>.</summary>
+    public static GameCommand Mag(string spell = "", int targetId = 0) => new() { Kind = GameCommandKind.Mag, Text = spell ?? "", Slot = 0, Dest = targetId };
+    /// <summary><c>C.Magic</c> with <c>SpellTargetLock=true</c> (WinForms targeting).</summary>
+    public static GameCommand MagTarget(string spell = "", int targetId = 0) => new() { Kind = GameCommandKind.MagTarget, Text = spell ?? "", Slot = 0, Dest = targetId };
 }
