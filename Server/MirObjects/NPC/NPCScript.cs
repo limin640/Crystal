@@ -139,7 +139,7 @@ namespace Server.MirObjects
 
             if (!Directory.Exists(Settings.NPCPath)) return;
 
-            string fileName = Path.Combine(Settings.NPCPath, FileName + ".txt");
+            string fileName = ResolveNpcFile(FileName);
 
             if (File.Exists(fileName))
             {
@@ -164,6 +164,28 @@ namespace Server.MirObjects
             else
                 MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.ScriptNotFound), FileName));
         }
+
+        /// <summary>
+        /// Jev FileName values use Windows backslashes. On Linux, Path.Combine
+        /// would treat them as a single segment — normalize so existing scripts load.
+        /// </summary>
+        static string ResolveNpcFile(string fileName)
+        {
+            string raw = Path.Combine(Settings.NPCPath, fileName + ".txt");
+            if (File.Exists(raw))
+                return raw;
+            string normalized = fileName.Replace('\\', Path.DirectorySeparatorChar)
+                                        .Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(Settings.NPCPath, normalized + ".txt");
+        }
+
+        static string ResolveEnvirFile(string relative)
+        {
+            string norm = relative.Replace('\\', Path.DirectorySeparatorChar)
+                                  .Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(Settings.EnvirPath, norm);
+        }
+
         public void ClearInfo()
         {
             Goods = new List<UserItem>();
@@ -312,7 +334,7 @@ namespace Server.MirObjects
 
                 if (split.Length < 2) continue;
 
-                string path = Path.Combine(Settings.EnvirPath, split[1].Substring(1, split[1].Length - 2));
+                string path = ResolveEnvirFile(split[1].Substring(1, split[1].Length - 2));
 
                 if (!File.Exists(path))
                     MessageQueue.Enqueue(GameLanguage.ServerTextMap.GetLocalization((ServerTextKeys.InsertScriptNotFound), path));
@@ -335,7 +357,7 @@ namespace Server.MirObjects
 
                 string[] split = lines[i].Split(' ');
 
-                string path = Path.Combine(Settings.EnvirPath, split[1].Substring(1, split[1].Length - 2));
+                string path = ResolveEnvirFile(split[1].Substring(1, split[1].Length - 2));
                 string page = ("[" + split[2] + "]").ToUpper();
 
                 bool start = false, finish = false;

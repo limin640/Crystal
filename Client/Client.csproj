@@ -38,11 +38,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="6.0.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
-    <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\Crystal.Graphics\Crystal.Graphics.csproj" />
+    <ProjectReference Include="..\Crystal.Audio\Crystal.Audio.csproj" />
   </ItemGroup>
 
   <ItemGroup>

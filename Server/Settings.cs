@@ -47,6 +47,11 @@ namespace Server
         public static int ThreadLimit = 2;
         public static bool TestServer = false;
         public static bool EnforceDBChecks = true;
+        /// <summary>
+        /// When the world cannot start (missing maps / DB checks), still bind the game port
+        /// so a Linux host can prove listen + handshake. Full play still needs a Crystal.Database tree.
+        /// </summary>
+        public static bool ListenWithoutWorld = false;
 
         public static bool MonsterProcessWhenAlone = false;
 
@@ -361,16 +366,71 @@ namespace Server
 
                 foreach (var path in paths)
                 {
-                    if (File.Exists(path))
-                        using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read))
-                        using (MD5 md5 = MD5.Create())
-                            VersionHashes.Add(md5.ComputeHash(stream));
+                    string trimmed = path.Trim();
+                    if (trimmed.Length == 0 || !File.Exists(trimmed))
+                        continue;
+
+                    if (IsVersionHashListPath(trimmed))
+                    {
+                        LoadVersionHashList(trimmed);
+                        continue;
+                    }
+
+                    using (FileStream stream = new FileStream(trimmed, FileMode.Open, FileAccess.Read))
+                    using (MD5 md5 = MD5.Create())
+                        VersionHashes.Add(md5.ComputeHash(stream));
                 }
 
             }
             catch (Exception ex)
             {
                 MessageQueue.Enqueue(ex);
+            }
+        }
+
+        /// <summary>
+        /// Operator hash list (<c>.md5</c> / <c>.hashes</c>): one 32-char hex MD5 per line.
+        /// Same comparison as hashing <c>Mir2.Exe</c>. Do not vendor the exe.
+        /// </summary>
+        static bool IsVersionHashListPath(string path)
+        {
+            string ext = Path.GetExtension(path);
+            return ext.Equals(".md5", StringComparison.OrdinalIgnoreCase)
+                   || ext.Equals(".hashes", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static void LoadVersionHashList(string path)
+        {
+            foreach (string raw in File.ReadAllLines(path))
+            {
+                string line = raw.Trim();
+                int comment = line.IndexOf('#');
+                if (comment >= 0)
+                    line = line[..comment].Trim();
+                if (line.Length == 0)
+                    continue;
+                int sep = line.IndexOfAny(new[] { ' ', '\t' });
+                string hex = (sep < 0 ? line : line[..sep]).Replace("-", "");
+                TryAddVersionHashHex(hex);
+            }
+        }
+
+        public static bool TryAddVersionHashHex(string hex)
+        {
+            VersionHashes ??= new List<byte[]>();
+            if (string.IsNullOrWhiteSpace(hex))
+                return false;
+            hex = hex.Trim().Replace("-", "");
+            if (hex.Length != 32)
+                return false;
+            try
+            {
+                VersionHashes.Add(Convert.FromHexString(hex));
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
             }
         }
 
@@ -385,6 +445,7 @@ namespace Server
             ThreadLimit = Reader.ReadInt32("General", "ThreadLimit", ThreadLimit);
             TestServer = Reader.ReadBoolean("General", "TestServer", TestServer);
             EnforceDBChecks = Reader.ReadBoolean("General", "EnforceDBChecks", EnforceDBChecks);
+            ListenWithoutWorld = Reader.ReadBoolean("General", "ListenWithoutWorld", ListenWithoutWorld);
             MonsterProcessWhenAlone = Reader.ReadBoolean("General", "MonsterProcessWhenAlone", MonsterProcessWhenAlone);
             Language=Reader.ReadString("General", "Language", Language);
 
@@ -673,6 +734,7 @@ namespace Server
             Reader.Write("General", "ThreadLimit", ThreadLimit);
             Reader.Write("General", "TestServer", TestServer);
             Reader.Write("General", "EnforceDBChecks", EnforceDBChecks);
+            Reader.Write("General", "ListenWithoutWorld", ListenWithoutWorld);
             Reader.Write("General", "MonsterProcessWhenAlone", MonsterProcessWhenAlone);
             Reader.Write("General", "Language", Language);
 

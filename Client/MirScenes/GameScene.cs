@@ -3,8 +3,7 @@ using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirObjects;
 using Client.MirSounds;
-using SlimDX;
-using SlimDX.Direct3D9;
+using System.Numerics;
 using Font = System.Drawing.Font;
 using S = ServerPackets;
 using C = ClientPackets;
@@ -10560,20 +10559,19 @@ namespace Client.MirScenes
             if (ControlTexture == null || ControlTexture.Disposed)
             {
                 DXManager.ControlList.Add(this);
-                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height, 1, Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
+                ControlTexture = DXManager.CreateRenderTarget(Size.Width, Size.Height);
                 TextureSize = Size;
             }
 
-            Surface oldSurface = DXManager.CurrentSurface;
-            Surface surface = ControlTexture.GetSurfaceLevel(0);
-            DXManager.SetSurface(surface);
-            DXManager.Device.Clear(ClearFlags.Target, BackColour, 0, 0);
+            var oldSurface = DXManager.CurrentSurface;
+            DXManager.SetSurface(ControlTexture.GetSurface());
+            DXManager.Clear(BackColour);
 
             DrawBackground();
 
             if (FloorValid)
             {
-                DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
+                DXManager.Draw(DXManager.FloorTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), 0, 0, Color.White);
             }
 
             DrawObjects();
@@ -10629,7 +10627,6 @@ namespace Client.MirScenes
                 MapObject.User.DrawName();
 
             DXManager.SetSurface(oldSurface);
-            surface.Dispose();
             TextureValid = true;
 
         }
@@ -10648,7 +10645,7 @@ namespace Client.MirScenes
 
             if (MapObject.User.Dead) DXManager.SetGrayscale(true);
 
-            DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White, Opacity);
+            DXManager.DrawOpaque(ControlTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), 0, 0, Color.White, Opacity);
 
             if (MapObject.User.Dead) DXManager.SetGrayscale(false);
 
@@ -10659,13 +10656,13 @@ namespace Client.MirScenes
         {
             if (DXManager.FloorTexture == null || DXManager.FloorTexture.Disposed)
             {
-                DXManager.FloorTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, 1, Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
-                DXManager.FloorSurface = DXManager.FloorTexture.GetSurfaceLevel(0);
+                DXManager.FloorTexture = DXManager.CreateRenderTarget(Settings.ScreenWidth, Settings.ScreenHeight);
+                DXManager.FloorSurface = DXManager.FloorTexture.GetSurface();
             }
 
-            Surface oldSurface = DXManager.CurrentSurface;
+            var oldSurface = DXManager.CurrentSurface;
             DXManager.SetSurface(DXManager.FloorSurface);
-            DXManager.Device.Clear(ClearFlags.Target, Color.Empty, 0, 0);
+            DXManager.Clear(Color.Empty);
 
 
             int startX = User.Movement.X - ViewRangeX;
@@ -10945,7 +10942,7 @@ namespace Client.MirScenes
                 }
             }
 
-            DXManager.Sprite.Flush();
+            DXManager.Flush();
             float oldOpacity = DXManager.Opacity;
             DXManager.SetOpacity(0.4F);
 
@@ -11027,11 +11024,11 @@ namespace Client.MirScenes
 
             if (DXManager.LightTexture == null || DXManager.LightTexture.Disposed)
             {
-                DXManager.LightTexture = new Texture(DXManager.Device, Settings.ScreenWidth, Settings.ScreenHeight, 1, Usage.RenderTarget, Format.A8R8G8B8, Pool.Default);
-                DXManager.LightSurface = DXManager.LightTexture.GetSurfaceLevel(0);
+                DXManager.LightTexture = DXManager.CreateRenderTarget(Settings.ScreenWidth, Settings.ScreenHeight);
+                DXManager.LightSurface = DXManager.LightTexture.GetSurface();
             }
 
-            Surface oldSurface = DXManager.CurrentSurface;
+            var oldSurface = DXManager.CurrentSurface;
             DXManager.SetSurface(DXManager.LightSurface);
 
             #region Night Lights
@@ -11076,15 +11073,13 @@ namespace Client.MirScenes
                 darkness = GetBlindLight(darkness);
             }
 
-            DXManager.Device.Clear(ClearFlags.Target, darkness, 0, 0);
+            DXManager.Clear(darkness);
 
             #endregion
 
             int light;
             Point p;
             DXManager.SetBlend(true);
-            DXManager.Device.SetRenderState(RenderState.SourceBlend, Blend.SourceAlpha);
-            DXManager.Device.SetRenderState(RenderState.DestinationBlend, Blend.One);
 
             #region Object Lights (Player/Mob/NPC)
             foreach (var ob in Objects.Values)
@@ -11135,7 +11130,7 @@ namespace Client.MirScenes
                     if (DXManager.Lights[lightRange] != null && !DXManager.Lights[lightRange].Disposed)
                     {
                         p.Offset(-(DXManager.LightSizes[lightRange].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[lightRange].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[lightRange], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
+                        DXManager.Draw(DXManager.Lights[lightRange], null, p.X, p.Y, lightColour);
                     }
                 }
 
@@ -11160,7 +11155,7 @@ namespace Client.MirScenes
                     if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
                     {
                         p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
+                        DXManager.Draw(DXManager.Lights[light], null, p.X, p.Y, lightColour);
                     }
 
                 }
@@ -11191,7 +11186,7 @@ namespace Client.MirScenes
                     if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
                     {
                         p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2), -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightColour);
+                        DXManager.Draw(DXManager.Lights[light], null, p.X, p.Y, lightColour);
                     }
                 }
             }
@@ -11255,7 +11250,7 @@ namespace Client.MirScenes
                     if (DXManager.Lights[light] != null && !DXManager.Lights[light].Disposed)
                     {
                         p.Offset(-(DXManager.LightSizes[light].X / 2) - (CellWidth / 2) + 10, -(DXManager.LightSizes[light].Y / 2) - (CellHeight / 2) - 5);
-                        DXManager.Draw(DXManager.Lights[light], null, new Vector3((float)p.X, (float)p.Y, 0.0F), lightIntensity);
+                        DXManager.Draw(DXManager.Lights[light], null, p.X, p.Y, lightIntensity);
                     }
                 }
             }
@@ -11264,13 +11259,11 @@ namespace Client.MirScenes
             DXManager.SetBlend(false);
             DXManager.SetSurface(oldSurface);
 
-            DXManager.Device.SetRenderState(RenderState.SourceBlend, Blend.Zero);
-            DXManager.Device.SetRenderState(RenderState.DestinationBlend, Blend.SourceColor);
+            DXManager.SetMultiplyBlend();
 
-            DXManager.Draw(DXManager.LightTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), Vector3.Zero, Color.White);
+            DXManager.Draw(DXManager.LightTexture, new Rectangle(0, 0, Settings.ScreenWidth, Settings.ScreenHeight), 0, 0, Color.White);
 
-            DXManager.Sprite.End();
-            DXManager.Sprite.Begin(SpriteFlags.AlphaBlend);
+            DXManager.SetBlend(false);
         }
 
         private static void OnMouseClick(object sender, EventArgs e)

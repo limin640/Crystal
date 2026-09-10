@@ -1,6 +1,5 @@
 ﻿using Client.MirGraphics;
 using Client.MirScenes;
-using SlimDX;
 
 namespace Client.MirControls
 {
@@ -86,7 +85,7 @@ namespace Client.MirControls
             }
         }
 
-        protected override Vector2[] BorderInfo
+        protected override PointF[] BorderInfo
         {
             get
             {
@@ -96,20 +95,20 @@ namespace Client.MirControls
                 {
                     _borderInfo = new[]
                         {
-                            new Vector2(DisplayRectangle.Left - 1, DisplayRectangle.Top - 1),
-                            new Vector2(DisplayRectangle.Right, DisplayRectangle.Top - 1),
+                            new PointF(DisplayRectangle.Left - 1, DisplayRectangle.Top - 1),
+                            new PointF(DisplayRectangle.Right, DisplayRectangle.Top - 1),
 
-                            new Vector2(DisplayRectangle.Left - 1, DisplayRectangle.Top - 1),
-                            new Vector2(DisplayRectangle.Left - 1, DisplayRectangle.Bottom),
+                            new PointF(DisplayRectangle.Left - 1, DisplayRectangle.Top - 1),
+                            new PointF(DisplayRectangle.Left - 1, DisplayRectangle.Bottom),
 
-                            new Vector2(DisplayRectangle.Left - 1, DisplayRectangle.Bottom),
-                            new Vector2(DisplayRectangle.Right, DisplayRectangle.Bottom),
+                            new PointF(DisplayRectangle.Left - 1, DisplayRectangle.Bottom),
+                            new PointF(DisplayRectangle.Right, DisplayRectangle.Bottom),
 
-                            new Vector2(DisplayRectangle.Right, DisplayRectangle.Top - 1),
-                            new Vector2(DisplayRectangle.Right, DisplayRectangle.Bottom),
+                            new PointF(DisplayRectangle.Right, DisplayRectangle.Top - 1),
+                            new PointF(DisplayRectangle.Right, DisplayRectangle.Bottom),
 
-                            new Vector2(DisplayRectangle.Left + 40, DisplayRectangle.Bottom),
-                            new Vector2(DisplayRectangle.Left + 40, DisplayRectangle.Top - 1)
+                            new PointF(DisplayRectangle.Left + 40, DisplayRectangle.Bottom),
+                            new PointF(DisplayRectangle.Left + 40, DisplayRectangle.Top - 1)
                         };
 
                     BorderRectangle = DisplayRectangle;

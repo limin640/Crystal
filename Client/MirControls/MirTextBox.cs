@@ -1,6 +1,5 @@
 ﻿using Client.MirGraphics;
-using SlimDX;
-using SlimDX.Direct3D9;
+using System.Drawing.Imaging;
 using System.Drawing.Imaging;
 
 namespace Client.MirControls
@@ -313,18 +312,9 @@ namespace Client.MirControls
             if (TextureSize != Size)
                 DisposeTexture();
 
-            if (ControlTexture == null || ControlTexture.Disposed)
-            {
-                DXManager.ControlList.Add(this);
-
-                ControlTexture = new Texture(DXManager.Device, Size.Width, Size.Height, 1, Usage.None, Format.A8R8G8B8, Pool.Managed);
-                TextureSize = Size;
-            }
-
             Point caret = GetCaretPosition();
 
-            DataRectangle stream = ControlTexture.LockRectangle(0, LockFlags.Discard);
-            using (Bitmap bm = new Bitmap(Size.Width, Size.Height, Size.Width * 4, PixelFormat.Format32bppArgb, stream.Data.DataPointer))
+            using (Bitmap bm = new Bitmap(Size.Width, Size.Height, PixelFormat.Format32bppArgb))
             {
                 TextBox.DrawToBitmap(bm, new Rectangle(0, 0, Size.Width, Size.Height));
                 using (Graphics graphics = Graphics.FromImage(bm))
@@ -334,9 +324,17 @@ namespace Client.MirControls
                         graphics.DrawLine(CaretPen, new Point(caret.X, caret.Y), new Point(caret.X, caret.Y + TextBox.Font.Height));
                 }
 
+                byte[] bgra = DXManager.CopyBitmapBgra(bm);
+                if (ControlTexture == null || ControlTexture.Disposed)
+                {
+                    DXManager.ControlList.Add(this);
+                    ControlTexture = DXManager.CreateManagedTexture(Size.Width, Size.Height, bgra);
+                    TextureSize = Size;
+                }
+                else
+                    DXManager.UpdateTexture(ControlTexture, bgra);
             }
-            ControlTexture.UnlockRectangle(0);
-            DXManager.Sprite.Flush();
+            DXManager.Flush();
             TextureValid = true;
         }
 

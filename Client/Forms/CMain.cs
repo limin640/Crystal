@@ -10,13 +10,11 @@ using Client.MirGraphics;
 using Client.MirNetwork;
 using Client.MirScenes;
 using Client.MirSounds;
-using SlimDX.Direct3D9;
-using SlimDX.Windows;
 using Font = System.Drawing.Font;
 
 namespace Client
 {
-    public partial class CMain : RenderForm
+    public partial class CMain : Form
     {
         public static MirControl DebugBaseLabel, HintBaseLabel;
         public static MirLabel DebugTextLabel, HintTextLabel, ScreenshotTextLabel;
@@ -86,8 +84,6 @@ namespace Client
 
                 LoadMouseCursors();
                 SetMouseCursor(MouseCursor.Default);
-
-                SlimDX.Configuration.EnableObjectTracking = true;
 
                 DXManager.Create();
                 SoundManager.Create();
@@ -393,19 +389,17 @@ namespace Client
                     return;
                 }
 
-                DXManager.Device.Clear(ClearFlags.Target, Color.Black, 0, 0);
-                DXManager.Device.BeginScene();
-                DXManager.Sprite.Begin(SpriteFlags.AlphaBlend);
+                DXManager.BeginFrame();
+                DXManager.Clear(Color.Black);
                 DXManager.SetSurface(DXManager.MainSurface);
 
                 if (MirScene.ActiveScene != null)
                     MirScene.ActiveScene.Draw();
 
-                DXManager.Sprite.End();
-                DXManager.Device.EndScene();
-                DXManager.Device.Present();
+                DXManager.EndFrame();
+                DXManager.Present();
             }
-            catch (Direct3D9Exception ex)
+            catch (Exception ex) when (ex.GetType().Name.Contains("Direct3D"))
             {
                 DXManager.DeviceLost = true;
                 SaveError(ex.ToString());
@@ -598,35 +592,28 @@ namespace Client
                 Now.ToShortDateString(),
                 Now.TimeOfDay);
 
-            Surface backbuffer = DXManager.Device.GetBackBuffer(0, 0);
+            string folder = Path.Combine(Application.StartupPath, @"Screenshots\");
+            if (!Directory.Exists(folder))
+                Directory.CreateDirectory(folder);
 
-            using (var stream = Surface.ToStream(backbuffer, ImageFileFormat.Png))
+            int count = Directory.GetFiles(folder, "*.png").Length;
+            string path = Path.Combine(folder, string.Format("Image {0}.png", count));
+
+            DXManager.TrySaveScreenshot(path, image =>
             {
-                Bitmap image = new Bitmap(stream);
-
-                using (Graphics graphics = Graphics.FromImage(image))
+                using Graphics graphics = Graphics.FromImage(image);
+                StringFormat sf = new StringFormat
                 {
-                    StringFormat sf = new StringFormat
-                    {
-                        LineAlignment = StringAlignment.Center,
-                        Alignment = StringAlignment.Center
-                    };
+                    LineAlignment = StringAlignment.Center,
+                    Alignment = StringAlignment.Center
+                };
 
-                    graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 3, 10), sf);
-                    graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 4, 9), sf);
-                    graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 5, 10), sf);
-                    graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 4, 11), sf);
-                    graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.White, new Point((Settings.ScreenWidth / 2) + 4, 10), sf);//SandyBrown               
-
-                    string path = Path.Combine(Application.StartupPath, @"Screenshots\");
-                    if (!Directory.Exists(path))
-                        Directory.CreateDirectory(path);
-
-                    int count = Directory.GetFiles(path, "*.png").Length;
-
-                    image.Save(Path.Combine(path, string.Format("Image {0}.png", count)), ImageFormat.Png);
-                }
-            }
+                graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 3, 10), sf);
+                graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 4, 9), sf);
+                graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 5, 10), sf);
+                graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.Black, new Point((Settings.ScreenWidth / 2) + 4, 11), sf);
+                graphics.DrawString(text, new Font(Settings.FontName, 9F), Brushes.White, new Point((Settings.ScreenWidth / 2) + 4, 10), sf);
+            });
         }
 
         public static void SaveError(string ex)
@@ -652,8 +639,8 @@ namespace Client
             Settings.ScreenHeight = height;
             Program.Form.ClientSize = new Size(width, height);
 
-            DXManager.Device.Clear(ClearFlags.Target, Color.Black, 0, 0);
-            DXManager.Device.Present();
+            DXManager.Clear(Color.Black);
+            DXManager.Present();
             DXManager.ResetDevice();
 
             if (!Settings.FullScreen)
