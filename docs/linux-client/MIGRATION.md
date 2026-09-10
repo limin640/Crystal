@@ -616,9 +616,35 @@ WinForms `BigMapDialog` toggles with `KeybindOptions.Bigmap` (B) and draws `Libr
 
 Client.Linux opens IRenderer chrome via `--input-script BigMap` / `BigMap:on` / `BigMap:off` / windowed B. Draw uses MapReader size + `MMap.Lib` frames (case-insensitive `DataPath`) when `--data` has the file — no invented tiles. `C.RequestMapInfo` is sent on open. World-map overlay / `SearchMap` / `TeleportToNPC` stay leftover (those sheets are catalog-missing).
 
-**Hard-gate** `--connect --headless` (dialog closed, no `--data`): **EXIT:0** — `BigMapOk=False` draws=0.
+**Hard-gate** `--connect --headless` (dialog closed, no `--data`): **EXIT:0**
 
-**Smoke** `--input-script BigMap` + `--data` (`init-sample` or operator pack): **EXIT:0** — `BigMapOk=True` draws≥1.
+```
+in-map: MapInformation index=1 file=0 title=BichonProvince minimapLib=101 bigmapLib=101
+VersionCheckOk=True VersionResult=1
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58296 by self
+  loot  : PickUp ground (HP)DrugSmall at 289,610 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=1
+hud bigmap: open=False BigMapOk=False draws=0 blips=0 mmap=False index=101 mini=101 size=700x700 src=-
+  input   : bigmaps=0 BigMapOk=False
+```
+
+**Smoke** `--connect --headless --data /tmp/crystal-mmap-sample --input-script BigMap` (`crystal-bake init-sample`, not a vendored pack): **EXIT:0**
+
+```
+send RequestMapInfo
+WorldMapSetup enabled=False icons=0 teleportCost=3000 (Prguse2/MapLinkIcon overlay leftover)
+NewMapInfo index=1 title=BichonProvince size=700x700 big=101 npcs=39 moves=5
+input BigMap open=True map=1 big=101 mini=101 size=700x700 npcs=39 #1
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58654 by self
+hud-lib MMap file=MMap.Lib ok=True images=4 src=/tmp/crystal-mmap-sample/MMap.Lib
+hud bigmap: open=True BigMapOk=True draws=69 blips=34 mmap=True index=101 mini=101 size=700x700 src=/tmp/crystal-mmap-sample/MMap.Lib
+```
+
+Jev `big=101` is past the 4-image fixture, so the MMap draw falls back to the first decoded frame (`mmapIndex=0`). Occupancy/blips come from MapReader 700×700 + packet objects. World overlay stays leftover (`WorldMapSetup enabled=False`).
+
+**Case-fold** `--data /tmp/crystal-mmap-case --input-script BigMap` (`mmap.Lib` only): **EXIT:0** — `BigMapOk=True` draws=70 mmap=True `src=/tmp/crystal-mmap-case/mmap.Lib`.
 
 ### Version hash (2026-09-10, same VM)
 

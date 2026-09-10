@@ -303,9 +303,23 @@ hud mmap: MagIcon2Ok=True mag2Draws=1 mag2Index=0 mag2Src=/tmp/crystal-mmap-samp
 
 IRenderer chrome (WinForms `BigMapDialog` / B). MapReader size + `MMap.Lib` when `--data` has the file. `--input-script BigMap`. No invented map art.
 
-**Hard-gate** (closed / no `--data`): **EXIT:0** — `BigMapOk=False` draws=0.
+**Hard-gate** `--connect --headless` (closed / no `--data`): **EXIT:0**
 
-**Smoke** `--input-script BigMap` + `--data`: **EXIT:0** — `BigMapOk=True` draws≥1.
+```
+hud bigmap: open=False BigMapOk=False draws=0 blips=0 mmap=False index=101
+FightHit=True LootOk=True EquipOk=True
+```
+
+**Smoke** `--data /tmp/crystal-mmap-sample --input-script BigMap` (`crystal-bake init-sample`): **EXIT:0**
+
+```
+send RequestMapInfo
+NewMapInfo index=1 title=BichonProvince size=700x700 big=101 npcs=39
+hud bigmap: open=True BigMapOk=True draws=69 blips=34 mmap=True src=/tmp/crystal-mmap-sample/MMap.Lib
+FightHit=True LootOk=True EquipOk=True
+```
+
+**Case-fold** `--data /tmp/crystal-mmap-case` (`mmap.Lib`): **EXIT:0** — `BigMapOk=True` draws=70 `src=/tmp/crystal-mmap-case/mmap.Lib`.
 
 ## Version hash (later)
 
@@ -322,4 +336,4 @@ FightHit=True LootOk=True EquipOk=True
 
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon load only when the operator `--data` tree has those files. Do not vendor Sound packs; fixture wav is not game art. Version hash uses an operator file or this host's Linux client DLL. See `MIGRATION.md` residuals checklist.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon / MagIcon2 load only when the operator `--data` tree has those files. Big-map chrome uses MapReader size + those frames; world-map overlay (`Prguse2` / `MapLinkIcon`) stays leftover. Do not vendor Sound packs; fixture wav is not game art. Version hash uses an operator file or this host's Linux client DLL. See `MIGRATION.md` residuals checklist.
