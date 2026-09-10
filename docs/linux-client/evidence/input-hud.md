@@ -350,9 +350,25 @@ FightHit=True LootOk=True EquipOk=True
 
 WinForms Title[820] / Prguse2[1360,1365,1366] via `--data`. Quad fallback. HUD probes without opening WorldMap.
 
-**Hard-gate** (no `--data`, WorldMap closed): **EXIT:0** — `TitleOk=False` `Prguse2Ok=False` draws=0.
+**Hard-gate** `--connect --headless` (no `--data`, WorldMap closed): **EXIT:0**
 
-**Smoke** `--data`: **EXIT:0** — `TitleOk=True` `Prguse2Ok=True` titleDraws≥1 prg2Draws≥1.
+```
+hud-lib skip Prguse2.Lib: missing (no --data / catalog sprite)
+hud chrome: TitleOk=True Prguse2Ok=False titleDraws=1 prg2Draws=0 titleSrc=catalog
+FightHit=True LootOk=True EquipOk=True
+```
+
+Fixture catalog already lists Title (2 sprites). Prguse2 skips. WorldMap stayed closed.
+
+**Smoke** `--data /tmp/crystal-mmap-sample` (WorldMap closed): **EXIT:0**
+
+```
+hud-lib Prguse2 file=Prguse2.Lib ok=True src=/tmp/crystal-mmap-sample/Prguse2.Lib
+hud chrome: TitleOk=True Prguse2Ok=True titleDraws=1 prg2Draws=1
+FightHit=True LootOk=True EquipOk=True
+```
+
+**Case-fold** `title.Lib` / `prguse2.Lib`: **EXIT:0** — src=`/tmp/crystal-mmap-case/title.Lib` / `prguse2.Lib`.
 
 ## Version hash (later)
 
