@@ -556,7 +556,15 @@ hud minimap: 700x700 blip=288,613 blips=39 draws=55 mmapLib=101
 hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapIndex=0 magIndex=0 mmapSrc=/tmp/crystal-mmap-sample/MMap.Lib magSrc=/tmp/crystal-mmap-sample/MagIcon.Lib images=4/4
 ```
 
-Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame (`mmapIndex=0`). Warrior has no `ClientMagic`; skill slot 0 probes `MagIcon[0]` (`magDraws=1`). Operator `--data` with a real pack uses the same parse+draw path. A pack that ships `mmap.Lib` (not `MMap.Lib`) opens through `DataPath` case-fold — no symlink.
+Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame (`mmapIndex=0`). Warrior has no `ClientMagic`; skill slot 0 probes `MagIcon[0]` (`magDraws=1`). Operator `--data` with a real pack uses the same parse+draw path.
+
+**Case-fold** `--data /tmp/crystal-mmap-case` with only `mmap.Lib` + `magicon.Lib` (no `MMap.Lib` symlink): **EXIT:0**
+
+```
+hud-lib MMap file=MMap.Lib ok=True images=4 src=/tmp/crystal-mmap-case/mmap.Lib
+hud-lib MagIcon file=MagIcon.Lib ok=True images=4 src=/tmp/crystal-mmap-case/magicon.Lib
+hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapSrc=/tmp/crystal-mmap-case/mmap.Lib magSrc=/tmp/crystal-mmap-case/magicon.Lib
+```
 
 ### Version hash (2026-09-10, same VM)
 

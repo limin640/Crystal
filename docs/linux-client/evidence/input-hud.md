@@ -266,6 +266,14 @@ Jev `mmapLib=101` is past the 4-image fixture, so draw uses the first decoded fr
 
 Operator pack: `--data /path/to/Crystal/Data` (do not vendor). Linux `DataPath` opens `mmap.Lib` as `MMap.Lib` (exact path, then directory case-fold). Bake fixture catalog still lists MMap/MagIcon among the **86** missing slots.
 
+**Case-fold smoke** `--data /tmp/crystal-mmap-case` (`mmap.Lib` / `magicon.Lib` only): **EXIT:0**
+
+```
+hud-lib MMap file=MMap.Lib ok=True src=/tmp/crystal-mmap-case/mmap.Lib
+hud-lib MagIcon file=MagIcon.Lib ok=True src=/tmp/crystal-mmap-case/magicon.Lib
+hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1
+```
+
 ## Version hash (later)
 
 Same MD5-of-file as WinForms. Server `--version-path` / Client `--version-file` (default `Crystal.Client.Linux.dll`). `--no-version-check` is opt-out. Do not vendor `Mir2.Exe`.
