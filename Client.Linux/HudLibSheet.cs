@@ -7,9 +7,9 @@ using Crystal.Graphics;
 namespace Client.Linux;
 
 /// <summary>
-/// Optional MMap.Lib / MagIcon.Lib / MagIcon2.Lib / MapLinkIcon.Lib tiles through <see cref="MLibParser"/> or a bake catalog.
+/// Optional HUD <c>.Lib</c> tiles through <see cref="MLibParser"/> or a bake catalog.
 /// Missing files are skipped — no invented texels. Operator <c>--data</c> / <c>CRYSTAL_DATA</c>.
-/// MagIcon2 is the WinForms skill-book sheet. MapLinkIcon is the world-map / movement icon sheet.
+/// Title / Prguse2 are WinForms big-map / world-overlay chrome (<c>Index 820</c>, <c>1360/1365/1366</c>).
 /// </summary>
 internal sealed class HudLibSheet : IDisposable
 {
@@ -23,22 +23,32 @@ internal sealed class HudLibSheet : IDisposable
     public bool MagIconOk { get; private set; }
     public bool MagIcon2Ok { get; private set; }
     public bool MapLinkIconOk { get; private set; }
+    public bool TitleOk { get; private set; }
+    public bool Prguse2Ok { get; private set; }
     public int MMapImages { get; private set; }
     public int MagIconImages { get; private set; }
     public int MagIcon2Images { get; private set; }
     public int MapLinkIconImages { get; private set; }
+    public int TitleImages { get; private set; }
+    public int Prguse2Images { get; private set; }
     public string? MMapSource { get; private set; }
     public string? MagIconSource { get; private set; }
     public string? MagIcon2Source { get; private set; }
     public string? MapLinkIconSource { get; private set; }
+    public string? TitleSource { get; private set; }
+    public string? Prguse2Source { get; private set; }
     public int MMapTileDraws { get; private set; }
     public int MagIconTileDraws { get; private set; }
     public int MagIcon2TileDraws { get; private set; }
     public int MapLinkIconTileDraws { get; private set; }
+    public int TitleTileDraws { get; private set; }
+    public int Prguse2TileDraws { get; private set; }
     public int MMapDrawIndex { get; private set; } = -1;
     public int MagIconDrawIndex { get; private set; } = -1;
     public int MagIcon2DrawIndex { get; private set; } = -1;
     public int MapLinkIconDrawIndex { get; private set; } = -1;
+    public int TitleDrawIndex { get; private set; } = -1;
+    public int Prguse2DrawIndex { get; private set; } = -1;
 
     public HudLibSheet(
         IRenderer renderer,
@@ -66,8 +76,10 @@ internal sealed class HudLibSheet : IDisposable
         Bind("MagIcon.Lib", dataRoot, BindKind.MagIcon);
         Bind("MagIcon2.Lib", dataRoot, BindKind.MagIcon2);
         Bind("MapLinkIcon.Lib", dataRoot, BindKind.MapLinkIcon);
+        Bind("Title.Lib", dataRoot, BindKind.Title);
+        Bind("Prguse2.Lib", dataRoot, BindKind.Prguse2);
 
-        Console.WriteLine($"hud-lib ready MMapOk={MMapOk} MagIconOk={MagIconOk} MagIcon2Ok={MagIcon2Ok} MapLinkIconOk={MapLinkIconOk} images={MMapImages}/{MagIconImages}/{MagIcon2Images}/{MapLinkIconImages}");
+        Console.WriteLine($"hud-lib ready MMapOk={MMapOk} MagIconOk={MagIconOk} MagIcon2Ok={MagIcon2Ok} MapLinkIconOk={MapLinkIconOk} TitleOk={TitleOk} Prguse2Ok={Prguse2Ok} images={MMapImages}/{MagIconImages}/{MagIcon2Images}/{MapLinkIconImages}/{TitleImages}/{Prguse2Images}");
     }
 
     public bool TryDrawMMap(int preferredIndex, int x, int y, int w, int h)
@@ -118,6 +130,26 @@ internal sealed class HudLibSheet : IDisposable
             return false;
         MapLinkIconTileDraws++;
         MapLinkIconDrawIndex = used;
+        return true;
+    }
+
+    public bool TryDrawTitle(int preferredIndex, int x, int y, int w, int h)
+    {
+        if (!TitleOk) return false;
+        if (!TryDrawPreferred("Title.Lib", preferredIndex, x, y, w, h, out int used))
+            return false;
+        TitleTileDraws++;
+        TitleDrawIndex = used;
+        return true;
+    }
+
+    public bool TryDrawPrguse2(int preferredIndex, int x, int y, int w, int h)
+    {
+        if (!Prguse2Ok) return false;
+        if (!TryDrawPreferred("Prguse2.Lib", preferredIndex, x, y, w, h, out int used))
+            return false;
+        Prguse2TileDraws++;
+        Prguse2DrawIndex = used;
         return true;
     }
 
@@ -205,12 +237,22 @@ internal sealed class HudLibSheet : IDisposable
                 MapLinkIconImages = images;
                 MapLinkIconSource = source;
                 break;
+            case BindKind.Title:
+                TitleOk = ok;
+                TitleImages = images;
+                TitleSource = source;
+                break;
+            case BindKind.Prguse2:
+                Prguse2Ok = ok;
+                Prguse2Images = images;
+                Prguse2Source = source;
+                break;
         }
 
         Console.WriteLine($"hud-lib {kind} file={fileName} ok={ok} images={images} src={source}");
     }
 
-    enum BindKind { MMap, MagIcon, MagIcon2, MapLinkIcon }
+    enum BindKind { MMap, MagIcon, MagIcon2, MapLinkIcon, Title, Prguse2 }
 
     bool TryDraw(string library, int index, int x, int y, int w, int h)
     {

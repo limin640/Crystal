@@ -14,6 +14,7 @@ public static class SampleDataWriter
         Directory.CreateDirectory(dataRoot);
 
         WriteLib(Path.Combine(dataRoot, "Prguse.Lib"), 4, 8);
+        WriteLib(Path.Combine(dataRoot, "Prguse2.Lib"), 4, 16);
         WriteLib(Path.Combine(dataRoot, "Title.Lib"), 2, 16);
         // WinForms Libraries.MiniMap / MagIcon live at DataPath + "MMap" / "MagIcon" (.Lib).
         // Synthetic checkers — not game art. Generate under /tmp via init-sample; do not vendor.

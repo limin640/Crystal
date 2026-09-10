@@ -83,6 +83,7 @@ internal sealed class SceneHud : IDisposable
         DrawSkillBook(312, height - 118, session);
         DrawChatLog(16, height - 176, session);
         DrawNpcPanel(270, 56, session);
+        DrawChromeProbes(width, height);
         DrawBigMap(width, height, session, mapView);
         DrawWorldOverlay(width, height, session);
 
@@ -114,6 +115,7 @@ internal sealed class SceneHud : IDisposable
         Console.WriteLine($"hud mmap: MMapOk={_libs?.MMapOk ?? false} MagIconOk={_libs?.MagIconOk ?? false} MagIcon2Ok={_libs?.MagIcon2Ok ?? false} mmapDraws={_libs?.MMapTileDraws ?? 0} magDraws={_libs?.MagIconTileDraws ?? 0} mag2Draws={_libs?.MagIcon2TileDraws ?? 0} mmapIndex={_libs?.MMapDrawIndex ?? -1} magIndex={_libs?.MagIconDrawIndex ?? -1} mag2Index={_libs?.MagIcon2DrawIndex ?? -1} mmapSrc={_libs?.MMapSource ?? "-"} magSrc={_libs?.MagIconSource ?? "-"} mag2Src={_libs?.MagIcon2Source ?? "-"} images={_libs?.MMapImages ?? 0}/{_libs?.MagIconImages ?? 0}/{_libs?.MagIcon2Images ?? 0}");
         Console.WriteLine($"hud bigmap: open={session.BigMapOpen} BigMapOk={session.BigMapOk} draws={session.BigMapDraws} blips={session.BigMapBlips} mmap={session.BigMapMmapDrawn} index={session.BigMapIndex} mini={session.MiniMapIndex} size={session.MapWidth}x{session.MapHeight} src={_libs?.MMapSource ?? "-"}");
         Console.WriteLine($"hud world: open={session.WorldMapOpen} WorldMapOk={session.WorldMapOk} MapLinkIconOk={_libs?.MapLinkIconOk ?? false} icons={session.WorldMapIconCount} drawn={session.WorldMapIconsDrawn} draws={session.WorldMapDraws} enabled={session.WorldMapEnabled} src={_libs?.MapLinkIconSource ?? "-"} images={_libs?.MapLinkIconImages ?? 0}");
+        Console.WriteLine($"hud chrome: TitleOk={_libs?.TitleOk ?? false} Prguse2Ok={_libs?.Prguse2Ok ?? false} titleDraws={_libs?.TitleTileDraws ?? 0} prg2Draws={_libs?.Prguse2TileDraws ?? 0} titleIndex={_libs?.TitleDrawIndex ?? -1} prg2Index={_libs?.Prguse2DrawIndex ?? -1} titleSrc={_libs?.TitleSource ?? "-"} prg2Src={_libs?.Prguse2Source ?? "-"} images={_libs?.TitleImages ?? 0}/{_libs?.Prguse2Images ?? 0}");
         Console.WriteLine($"hud search: SearchMapOk={session.SearchMapOk} q={session.SearchQuery ?? "-"} map={session.SearchMapIndex} npc={session.SearchNpcIndex} searches={session.InputSearches}");
         Console.WriteLine($"hud teleport: TeleportOk={session.TeleportOk} id={session.SelectedNpcId} name={session.SelectedNpcName ?? "-"} cost={session.TeleportToNpcCost} gold={session.UserGold} teleports={session.InputTeleports} can={session.MapNpcs.Count(n => n.CanTeleportTo)}");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
@@ -370,7 +372,9 @@ internal sealed class SceneHud : IDisposable
         int panelH = Math.Min(400, Math.Max(220, height - 96));
         int x = (width - panelW) / 2;
         int y = 48;
-        Fill(x, y, panelW, panelH, Color.FromArgb(220, 12, 16, 20));
+        // WinForms BigMapDialog: Libraries.Title Index 820. Quad fallback if Title.Lib missing.
+        if (!(_libs?.TryDrawTitle(820, x, y, panelW, panelH) ?? false))
+            Fill(x, y, panelW, panelH, Color.FromArgb(220, 12, 16, 20));
         Text(x + 8, y + 4, "BIGMAP", Color.PaleGoldenrod);
         Text(x + 72, y + 4, session.MapTitle ?? "?", Color.White);
         Text(x + panelW - 140, y + 4, $"[{session.UserLocation.X},{session.UserLocation.Y}]", Color.Gainsboro);
@@ -455,6 +459,12 @@ internal sealed class SceneHud : IDisposable
         if (session.SearchMapOk)
             Text(x + 80, y + panelH - 14, $"FIND {session.SearchQuery} → map={session.SearchMapIndex} npc={session.SearchNpcIndex}", Color.Khaki);
 
+        // Title buttons 827/824/821 (World / MyLocation / Teleport) — skip if frames absent.
+        _libs?.TryDrawTitle(827, x + 200, y + panelH - 18, 20, 14);
+        _libs?.TryDrawTitle(824, x + 320, y + panelH - 18, 20, 14);
+        _libs?.TryDrawTitle(821, x + panelW - 80, y + panelH - 18, 20, 14);
+        _libs?.TryDrawPrguse2(360, x + panelW - 22, y + 2, 14, 14);
+
         BigMapDraws = HudDraws - before;
         session.MarkBigMapDraw(BigMapDraws, BigMapBlips, mmapTile);
     }
@@ -476,7 +486,15 @@ internal sealed class SceneHud : IDisposable
         int panelH = Math.Min(400, Math.Max(220, height - 96));
         int x = (width - panelW) / 2;
         int y = 48;
-        Fill(x + 12, y + 22, panelW - 24, panelH - 44, Color.FromArgb(200, 16, 20, 28));
+        int ox = x + 12;
+        int oy = y + 22;
+        int ow = panelW - 24;
+        int oh = panelH - 44;
+        // WinForms WorldMapImage: Prguse2 1360 + clouds 1365 + border 1366. Quads if absent.
+        if (!(_libs?.TryDrawPrguse2(1360, ox, oy, ow, oh) ?? false))
+            Fill(ox, oy, ow, oh, Color.FromArgb(200, 16, 20, 28));
+        _libs?.TryDrawPrguse2(1365, ox, oy, ow, oh);
+        _libs?.TryDrawPrguse2(1366, ox, oy, ow, oh);
         Text(x + 20, y + 26, "WORLD", Color.Gold);
         Text(x + 80, y + 26, session.WorldMapEnabled ? "ON" : "OFF", session.WorldMapEnabled ? Color.PaleGreen : Color.Gray);
         Text(x + panelW - 180, y + 26, $"icons={session.WorldMapIconCount} cost={session.TeleportToNpcCost}", Color.Gainsboro);
@@ -501,6 +519,21 @@ internal sealed class SceneHud : IDisposable
 
         int draws = HudDraws - before;
         session.MarkWorldMapDraw(draws, iconsDrawn);
+    }
+
+    /// <summary>
+    /// Probe WinForms Title[820] / Prguse2[1360] when <c>--data</c> has the libs.
+    /// Does not require BigMap/WorldMap open — hard-gate stays closed.
+    /// </summary>
+    void DrawChromeProbes(int width, int height)
+    {
+        int x = width - 140;
+        int y = 184;
+        if (_libs?.TryDrawTitle(820, x, y, 16, 16) == true)
+            Text(x + 18, y, "TIT", Color.Wheat);
+        if (_libs?.TryDrawPrguse2(1360, x, y + 18, 16, 16) == true)
+            Text(x + 18, y + 18, "P2", Color.Thistle);
+        _ = height;
     }
 
     void DrawEquipPanel(int x, int y, CrystalSession session)

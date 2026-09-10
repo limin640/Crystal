@@ -147,7 +147,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--connect` | Shared `Packet` session (Connected → version → account → select → StartGame) |
 | `--login-only` | Stop after `LoginSuccess` (no NewCharacter / StartGame) |
 | `--maps <dir>` | External Jev `Maps/` for `.map` load (`CRYSTAL_MAPS`). Not vendored. |
-| `--data <dir>` | Optional client Data tree (`CRYSTAL_DATA`). `MapView` floor `.Lib` plus `MMap.Lib` / `MagIcon.Lib` / `MagIcon2.Lib` / `MapLinkIcon.Lib` HUD tiles via `MLibParser`. Linux open is case-insensitive. Missing files skip. Do not vendor the pack. |
+| `--data <dir>` | Optional client Data tree (`CRYSTAL_DATA`). HUD `.Lib` tiles (`MMap` / `MagIcon` / `MagIcon2` / `MapLinkIcon` / `Title` / `Prguse2`) via `MLibParser`. Linux open is case-insensitive. Missing files skip. Do not vendor the pack. |
 | `--catalog` | Bake atlas catalog (fixture or operator bake-out) |
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |

@@ -346,6 +346,14 @@ FightHit=True LootOk=True EquipOk=True
 
 **Case-fold** `maplinkicon.Lib`: **EXIT:0** — `src=/tmp/crystal-mmap-case/maplinkicon.Lib`.
 
+## Title / Prguse2 chrome (later)
+
+WinForms Title[820] / Prguse2[1360,1365,1366] via `--data`. Quad fallback. HUD probes without opening WorldMap.
+
+**Hard-gate** (no `--data`, WorldMap closed): **EXIT:0** — `TitleOk=False` `Prguse2Ok=False` draws=0.
+
+**Smoke** `--data`: **EXIT:0** — `TitleOk=True` `Prguse2Ok=True` titleDraws≥1 prg2Draws≥1.
+
 ## Version hash (later)
 
 Same MD5-of-file as WinForms. Server `--version-path` / Client `--version-file` (default `Crystal.Client.Linux.dll`). `--no-version-check` is opt-out. Do not vendor `Mir2.Exe`.
@@ -361,4 +369,4 @@ FightHit=True LootOk=True EquipOk=True
 
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon / MagIcon2 / MapLinkIcon load only when the operator `--data` tree has those files. World overlay uses MapLinkIcon frames or quads — no invented Prguse2. Do not vendor Sound packs; fixture wav is not game art. Version hash uses an operator file or this host's Linux client DLL. See `MIGRATION.md` residuals checklist.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. Title / Prguse2 / MapLinkIcon load only when the operator `--data` tree has those files. Quad fallback when frames are missing — no invented art. Do not vendor Sound packs; fixture wav is not game art. Version hash uses an operator file or this host's Linux client DLL. See `MIGRATION.md` residuals checklist.

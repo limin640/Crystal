@@ -82,6 +82,12 @@ internal static class Program
             Settings.AllowStartGame = true;
         if (args.Contains("--test-server"))
             Settings.TestServer = true;
+        if (args.Contains("--world-map-enabled"))
+        {
+            // Flip existing WorldMap.ini Enabled only — do not invent Layout icons or map data.
+            Settings.WorldMapSetup.Enabled = true;
+            Console.WriteLine($"WorldMapSetup.Enabled=True (CLI; icons={Settings.WorldMapSetup.Icons.Count} from WorldMap.ini Layout, not invented)");
+        }
 
         if (hasFullWorld)
         {
@@ -262,6 +268,7 @@ internal static class Program
               --no-version-check        Settings.CheckVersion=false (opt-out). Not required when hashes match.
               --allow-start-game        Settings.AllowStartGame=true (StartGame Result 4; default in stock Jev Setup.ini)
               --test-server             Settings.TestServer=true — enables existing @LEVEL/@MOB/@MAKE/@MOVE (no invented commands)
+              --world-map-enabled       Settings.WorldMapSetup.Enabled=true (existing WorldMap.ini). Does not invent Layout icons.
               --listen-without-world    Bind 7000 even if maps/DB checks fail (handshake/login only).
                                         Ignored when Server.MirDB and *.map files exist — full Envir starts.
               --no-db-checks            Settings.EnforceDBChecks=false

@@ -686,6 +686,16 @@ Jev `WorldMap.ini` has no icons, so overlay chrome is quads (`draws=64`) — no 
 
 **Case-fold** `--data /tmp/crystal-mmap-case` (`maplinkicon.Lib`): **EXIT:0** — `MapLinkIconOk=True` `src=/tmp/crystal-mmap-case/maplinkicon.Lib` `WorldMapOk=True`.
 
+### Title / Prguse2 chrome (2026-09-10, same VM)
+
+WinForms `BigMapDialog` uses `Libraries.Title` Index **820** (also 827/824/821 buttons). `WorldMapImage` uses `Libraries.Prguse2` **1360 / 1365 / 1366** (radar 1350, close 360). Client.Linux binds `Title.Lib` / `Prguse2.Lib` via case-insensitive `DataPath` and draws those indices when `--data` has the files; quads if absent. HUD probes Title[820] / Prguse2[1360] **without** opening WorldMap.
+
+Jev `Configs/WorldMap.ini` is `Enabled=False` with an empty Layout. Server `--world-map-enabled` sets `WorldMapSetup.Enabled=true` for the process only (not written back) and does **not** invent Button icons.
+
+**Hard-gate** `--connect --headless` (no `--data`, WorldMap closed): **EXIT:0** — `TitleOk=False` `Prguse2Ok=False` titleDraws=0 prg2Draws=0.
+
+**Smoke** `--data` (`init-sample` or operator Data): **EXIT:0** — `TitleOk=True` `Prguse2Ok=True` titleDraws≥1 prg2Draws≥1.
+
 ### Version hash (2026-09-10, same VM)
 
 WinForms `LoginScene.SendVersion` MD5s `Application.ExecutablePath`. Server `Settings.LoadVersion` MD5s each `VersionPath` file (default `.\Mir2.Exe`) and `MirConnection.ClientVersion` compares `C.ClientVersion.VersionHash` when `CheckVersion` is true.
@@ -728,7 +738,8 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
 - [x] **`MMap.Lib` / MagIcon / MagIcon2 tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Linux open is case-insensitive. MagIcon2 is the skill-book sheet (`MagicButton` / `AssignKeyPanel`). `--input-script Mag` / `MagTarget` send `C.Magic`. Skip when absent (`MagIcon2Ok=False`). Leftover: no WinForms skill-book keybind panel / full targeting cursor. Operator Data stays outside git.
 - [x] **Big-map dialog** — IRenderer chrome toggled by `--input-script BigMap` / windowed B (`KeybindOptions.Bigmap`). MapReader size + `MMap.Lib` at `MapInformation.BigMap` when `--data` has the file. `C.RequestMapInfo` on open. Skip draw when closed (`BigMapOk=False`).
-- [x] **World overlay / SearchMap / TeleportToNPC** — `MapLinkIcon.Lib` via case-insensitive `DataPath` when present (quad chrome if Prguse2/Title frames missing; no invented world art). `--input-script WorldMap` / `SearchMap:text` / `TeleportNpc`. `S.WorldMapSetupInfo` / `S.SearchMapResult` / `S.LoseGold` logged. Jev `WorldMap.ini` is `Enabled=False` with no icons — overlay still draws packet chrome. Leftover: WinForms Prguse2 world bitmap.
+- [x] **World overlay / SearchMap / TeleportToNPC** — `MapLinkIcon.Lib` via case-insensitive `DataPath` when present. `--input-script WorldMap` / `SearchMap:text` / `TeleportNpc`. Jev `WorldMap.ini` is `Enabled=False` with no Layout icons (server `--world-map-enabled` flips Enabled only; does not invent icons).
+- [x] **Title / Prguse2 dialog chrome** — `Title.Lib` Index 820 (BigMapDialog) and `Prguse2.Lib` 1360/1365/1366 (WorldMapImage) via `DataPath` when `--data` has the files. Quad fallback when absent. HUD probes those frames without opening WorldMap. Leftover: full WinForms button hover/pressed indices.
 - [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [x] **Version hash** — same MD5-of-file as WinForms `LoginScene.SendVersion` / `Settings.LoadVersion`. Server `--version-path` / `CRYSTAL_VERSION_PATH` (file or `.md5` / `.hashes` list) + Client `--version-file` / `CRYSTAL_VERSION_FILE` (default: this host's `Crystal.Client.Linux.dll`). `--no-version-check` remains an opt-out. Do not vendor `Mir2.Exe`. Leftover: a Windows server that only lists `Mir2.Exe` needs the operator to add the Linux client hash or point Linux `--version-file` at that exe.
