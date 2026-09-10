@@ -264,7 +264,7 @@ hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapIndex=0 magIndex
 
 Jev `mmapLib=101` is past the 4-image fixture, so draw uses the first decoded frame.
 
-Operator pack: `--data /path/to/Crystal/Data` (do not vendor). Bake fixture catalog still lists MMap/MagIcon among the **86** missing slots.
+Operator pack: `--data /path/to/Crystal/Data` (do not vendor). Linux `DataPath` opens `mmap.Lib` as `MMap.Lib` (exact path, then directory case-fold). Bake fixture catalog still lists MMap/MagIcon among the **86** missing slots.
 
 ## Version hash (later)
 

@@ -214,22 +214,7 @@ internal sealed class HudLibSheet : IDisposable
         => _catalogSprites.Keys.Any(k => string.Equals(k.Library, library, StringComparison.OrdinalIgnoreCase));
 
     static string? ResolveOnDisk(string dataRoot, string fileName)
-    {
-        string stem = Path.GetFileNameWithoutExtension(fileName);
-        foreach (string probe in new[]
-                 {
-                     Path.Combine(dataRoot, fileName),
-                     Path.Combine(dataRoot, stem + ".Lib"),
-                     Path.Combine(dataRoot, stem + ".lib"),
-                     Path.Combine(dataRoot, stem)
-                 })
-        {
-            if (File.Exists(probe))
-                return Path.GetFullPath(probe);
-        }
-
-        return null;
-    }
+        => DataPath.ResolveFile(dataRoot, fileName);
 
     static string Normalize(string library) => library.Replace('\\', '/');
 

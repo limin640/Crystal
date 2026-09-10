@@ -527,7 +527,7 @@ hud quest: info=154 taken=0 done=1 accepts=0 AcceptOk=False FinishOk=False
 
 ### MMap.Lib / MagIcon tiles (2026-09-10, same VM)
 
-WinForms `Libraries.MiniMap` / `Libraries.MagIcon` are `Settings.DataPath + "MMap"` / `"MagIcon"` (`.Lib`). Client.Linux uses the same files through `Crystal.Assets` `LibraryParser` / `MLibParser` + `IRenderer` when `--data` / `CRYSTAL_DATA` points at an external Data tree (or a bake catalog sprite exists). Missing files skip — no invented texels. Do not vendor the pack.
+WinForms `Libraries.MiniMap` / `Libraries.MagIcon` are `Settings.DataPath + "MMap"` / `"MagIcon"` (`.Lib`). Client.Linux uses the same files through `Crystal.Assets` `LibraryParser` / `MLibParser` + `IRenderer` when `--data` / `CRYSTAL_DATA` points at an external Data tree (or a bake catalog sprite exists). Missing files skip — no invented texels. Do not vendor the pack. On Linux, `DataPath` tries the exact name then a case-fold match in the directory so an operator `mmap.Lib` opens as `MMap.Lib` (no symlink). The same resolver is used for other Data `.Lib` paths in `MapView`.
 
 Bake fixture `Tools/Crystal.Bake/fixtures/bake-out` has no MMap/MagIcon sprites (they stay in the listed **86** missing catalog slots). Operator path: download the mirfiles Crystal `Data` folder (the directory that contains `MMap.Lib` and `MagIcon.Lib`) and pass `--data /path/to/Data`. Smoke without a pack: `crystal-bake init-sample /tmp/crystal-mmap-sample` writes synthetic checkers (not game art) including those two files.
 
@@ -556,7 +556,7 @@ hud minimap: 700x700 blip=288,613 blips=39 draws=55 mmapLib=101
 hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapIndex=0 magIndex=0 mmapSrc=/tmp/crystal-mmap-sample/MMap.Lib magSrc=/tmp/crystal-mmap-sample/MagIcon.Lib images=4/4
 ```
 
-Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame (`mmapIndex=0`). Warrior has no `ClientMagic`; skill slot 0 probes `MagIcon[0]` (`magDraws=1`). Operator `--data` with a real pack uses the same parse+draw path.
+Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame (`mmapIndex=0`). Warrior has no `ClientMagic`; skill slot 0 probes `MagIcon[0]` (`magDraws=1`). Operator `--data` with a real pack uses the same parse+draw path. A pack that ships `mmap.Lib` (not `MMap.Lib`) opens through `DataPath` case-fold — no symlink.
 
 ### Version hash (2026-09-10, same VM)
 
@@ -598,7 +598,7 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **Full WinForms `GameScene`** — Client.Linux is Shared packets + `MapView` + IRenderer HUD, not a language rewrite of the scene graph / dialogs.
 - [ ] **WebView2** — Windows-only (WinForms Evergreen; no Linux runtime). Permanently deferred on Linux. `Client.Linux` must never reference it.
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
-- [x] **`MMap.Lib` / MagIcon tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Skip when absent (`MMapOk=False`). Leftover: no big-map dialog, no MagIcon2 skill-book / targeting, no invented tiles. Operator Data stays outside git.
+- [x] **`MMap.Lib` / MagIcon tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Linux open is case-insensitive (`mmap.Lib` matches `MMap.Lib`; no symlink). Skip when absent (`MMapOk=False`). Leftover: no big-map dialog, no MagIcon2 skill-book / targeting, no invented tiles. Operator Data stays outside git.
 - [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [x] **Version hash** — same MD5-of-file as WinForms `LoginScene.SendVersion` / `Settings.LoadVersion`. Server `--version-path` / `CRYSTAL_VERSION_PATH` (file or `.md5` / `.hashes` list) + Client `--version-file` / `CRYSTAL_VERSION_FILE` (default: this host's `Crystal.Client.Linux.dll`). `--no-version-check` remains an opt-out. Do not vendor `Mir2.Exe`. Leftover: a Windows server that only lists `Mir2.Exe` needs the operator to add the Linux client hash or point Linux `--version-file` at that exe.

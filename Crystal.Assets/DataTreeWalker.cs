@@ -74,11 +74,6 @@ public static class DataTreeWalker
         if (expected == null)
             return null;
 
-        if (File.Exists(expected))
-            return expected;
-
-        string alt = Path.ChangeExtension(payloadPath, expected.EndsWith(".Wix", StringComparison.OrdinalIgnoreCase) ? ".wix"
-            : expected.EndsWith(".Wzx", StringComparison.OrdinalIgnoreCase) ? ".wzx" : ".mix");
-        return File.Exists(alt) ? alt : null;
+        return DataPath.ResolveExisting(expected);
     }
 }

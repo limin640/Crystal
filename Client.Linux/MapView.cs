@@ -202,8 +202,8 @@ internal sealed class MapView : IDisposable
         {
             if (!_parsedLibs.TryGetValue(library, out var parsed))
             {
-                string path = Path.Combine(_dataRoot, library.Replace('/', Path.DirectorySeparatorChar));
-                if (!File.Exists(path))
+                string? path = DataPath.ResolveFile(_dataRoot, library);
+                if (path == null)
                     return false;
                 parsed = LibraryParser.Parse(new DiscoveredLibrary
                 {

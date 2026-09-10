@@ -18,8 +18,12 @@ public static class CoverageBuilder
             string dir = Path.Combine(dataRoot, folder);
             if (!Directory.Exists(dir))
                 continue;
-            foreach (string file in Directory.EnumerateFiles(dir, "*.Lib"))
+            foreach (string file in Directory.EnumerateFiles(dir))
+            {
+                if (!file.EndsWith(".Lib", StringComparison.OrdinalIgnoreCase))
+                    continue;
                 present.Add(Path.GetRelativePath(dataRoot, file).Replace('\\', '/'));
+            }
         }
 
         int listed = parsed.Sum(p => p.HeaderParsed ? Math.Max(p.ImageCount, p.Images.Count) : 0);
