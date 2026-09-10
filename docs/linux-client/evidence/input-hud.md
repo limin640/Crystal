@@ -245,9 +245,24 @@ QuestAcceptOk=True QuestFinishOk=True
 
 Optional `--data` / `CRYSTAL_DATA`. Same files as WinForms `Libraries.MiniMap` / `MagIcon`. Parse via `MLibParser`; draw via `IRenderer`. Skip when absent.
 
-**Hard-gate** `--connect --headless` (no `--data`): **EXIT:0** — `MMapOk=False MagIconOk=False` mmapDraws=0 magDraws=0.
+**Hard-gate** `--connect --headless` (no `--data`): **EXIT:0**
 
-**Smoke** `--data` from `crystal-bake init-sample` (synthetic checkers, not game art): **EXIT:0** — `MMapOk=True MagIconOk=True` plus draw counts.
+```
+hud-lib skip MMap.Lib: missing (no --data / catalog sprite)
+hud-lib ready MMapOk=False MagIconOk=False images=0/0
+FightHit=True LootOk=True EquipOk=True
+hud mmap: MMapOk=False MagIconOk=False mmapDraws=0 magDraws=0
+```
+
+**Hard-gate** `--connect --headless --data /tmp/crystal-mmap-sample` (`crystal-bake init-sample`, synthetic checkers, not game art): **EXIT:0**
+
+```
+hud-lib ready MMapOk=True MagIconOk=True images=4/4
+FightHit=True LootOk=True EquipOk=True
+hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapIndex=0 magIndex=0
+```
+
+Jev `mmapLib=101` is past the 4-image fixture, so draw uses the first decoded frame.
 
 Operator pack: `--data /path/to/Crystal/Data` (do not vendor). Bake fixture catalog still lists MMap/MagIcon among the **86** missing slots.
 

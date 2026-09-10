@@ -531,9 +531,32 @@ WinForms `Libraries.MiniMap` / `Libraries.MagIcon` are `Settings.DataPath + "MMa
 
 Bake fixture `Tools/Crystal.Bake/fixtures/bake-out` has no MMap/MagIcon sprites (they stay in the listed **86** missing catalog slots). Operator path: download the mirfiles Crystal `Data` folder (the directory that contains `MMap.Lib` and `MagIcon.Lib`) and pass `--data /path/to/Data`. Smoke without a pack: `crystal-bake init-sample /tmp/crystal-mmap-sample` writes synthetic checkers (not game art) including those two files.
 
-**Hard-gate** `--connect --headless` (no `--data`): **EXIT:0** — `MMapOk=False MagIconOk=False` mmapDraws=0 magDraws=0 (skip).
+**Hard-gate** `--connect --headless` (no `--data`): **EXIT:0**
 
-**Smoke** `--connect --headless --no-gate --data /tmp/crystal-mmap-sample`: **EXIT:0** — `MMapOk=True MagIconOk=True` plus draw counts. Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame.
+```
+hud-lib skip MMap.Lib: missing (no --data / catalog sprite)
+hud-lib skip MagIcon.Lib: missing (no --data / catalog sprite)
+hud-lib skip MagIcon2.Lib: missing (no --data / catalog sprite)
+hud-lib ready MMapOk=False MagIconOk=False images=0/0
+FightHit=True FightDied=False LootOk=True EquipOk=True
+hud mmap: MMapOk=False MagIconOk=False mmapDraws=0 magDraws=0 mmapIndex=-1 magIndex=-1 mmapSrc=- magSrc=- images=0/0
+```
+
+**Hard-gate** `--connect --headless --data /tmp/crystal-mmap-sample` (`crystal-bake init-sample`, not a vendored pack): **EXIT:0**
+
+```
+hud-lib MMap file=MMap.Lib ok=True images=4 src=/tmp/crystal-mmap-sample/MMap.Lib
+hud-lib MagIcon file=MagIcon.Lib ok=True images=4 src=/tmp/crystal-mmap-sample/MagIcon.Lib
+hud-lib ready MMapOk=True MagIconOk=True images=4/4
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58654 by self
+  loot  : PickUp ground (HP)DrugSmall at 288,613 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=5
+hud minimap: 700x700 blip=288,613 blips=39 draws=55 mmapLib=101
+hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapIndex=0 magIndex=0 mmapSrc=/tmp/crystal-mmap-sample/MMap.Lib magSrc=/tmp/crystal-mmap-sample/MagIcon.Lib images=4/4
+```
+
+Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame (`mmapIndex=0`). Warrior has no `ClientMagic`; skill slot 0 probes `MagIcon[0]` (`magDraws=1`). Operator `--data` with a real pack uses the same parse+draw path.
 
 ## Remaining residuals (checklist)
 
