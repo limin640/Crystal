@@ -107,6 +107,8 @@ internal static class Program
             opt.Account = accOverride;
         if (GetOption(args, "--password") is string pwOverride)
             opt.Password = pwOverride;
+        opt.VersionFile = GetOption(args, "--version-file") ?? Environment.GetEnvironmentVariable("CRYSTAL_VERSION_FILE");
+        opt.VersionHashHex = GetOption(args, "--version-hash") ?? Environment.GetEnvironmentVariable("CRYSTAL_VERSION_HASH");
 
         return CrystalSession.Run(opt);
     }
@@ -165,6 +167,7 @@ internal static class Program
         }
         if (session != null)
         {
+            Console.WriteLine($"  version : VersionCheckOk={session.VersionCheckOk} Result={session.VersionResult?.ToString() ?? "-"} src={session.VersionHashSource ?? "-"} md5={session.VersionHashHex ?? "-"}");
             Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} drags={session.InputDrags} quests={session.InputQuests} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} DragOk={session.DragOk} QuestAcceptOk={session.QuestAcceptOk} QuestFinishOk={session.QuestFinishOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
             Console.WriteLine($"  items   : bag={session.BagCount} gold={session.UserGold} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
             if (session.BuyEvidence != null)

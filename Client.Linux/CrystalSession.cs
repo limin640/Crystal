@@ -19,6 +19,10 @@ internal sealed class ConnectOptions
     public bool PlayGate { get; set; } = true;
     public int WaitMs { get; set; } = 1500;
     public int EnterWaitMs { get; set; } = 5000;
+    /// <summary>File to MD5 for <c>C.ClientVersion</c> (WinForms uses the running exe). Env: <c>CRYSTAL_VERSION_FILE</c>.</summary>
+    public string? VersionFile { get; set; }
+    /// <summary>Raw 32-char hex MD5 when the operator has a hash list instead of a file. Env: <c>CRYSTAL_VERSION_HASH</c>.</summary>
+    public string? VersionHashHex { get; set; }
 }
 
 /// <summary>
@@ -48,6 +52,9 @@ internal sealed class CrystalSession : IDisposable
     public bool SocketConnected => _client.Connected;
     public bool GotConnected { get; private set; }
     public byte? VersionResult { get; private set; }
+    public bool VersionCheckOk { get; private set; }
+    public string? VersionHashSource { get; private set; }
+    public string? VersionHashHex { get; private set; }
     public byte? NewAccountResult { get; private set; }
     public byte? LoginResult { get; private set; }
     public bool LoginSuccess { get; private set; }
@@ -1028,7 +1035,8 @@ internal sealed class CrystalSession : IDisposable
                 break;
             case S.ClientVersion v:
                 VersionResult = v.Result;
-                Note($"handshake: ClientVersion Result={v.Result} ({(v.Result == 1 ? "match" : "reject")})");
+                VersionCheckOk = v.Result == 1;
+                Note($"handshake: ClientVersion Result={v.Result} ({(v.Result == 1 ? "match" : "reject")}) VersionCheckOk={VersionCheckOk} src={VersionHashSource ?? "-"} md5={VersionHashHex ?? "-"}");
                 break;
             case S.NewAccount n:
                 NewAccountResult = n.Result;
@@ -1541,15 +1549,21 @@ internal sealed class CrystalSession : IDisposable
             return 5;
         }
 
-        Send(new C.ClientVersion { VersionHash = new byte[16] });
+        byte[] hash = VersionHash.Resolve(opt.VersionFile, opt.VersionHashHex, out string hashSource);
+        VersionHashSource = hashSource;
+        VersionHashHex = VersionHash.ToHex(hash);
+        Console.WriteLine($"version: src={hashSource} md5={VersionHashHex} bytes={hash.Length}");
+        Send(new C.ClientVersion { VersionHash = hash });
         Pump(800);
 
         if (VersionResult is 0)
         {
-            Console.Error.WriteLine("Server rejected client version. Start Server.Linux with --no-version-check.");
+            Console.Error.WriteLine("Server rejected client version. Point Server.Linux --version-path / Client.Linux --version-file at the same file (or matching --version-hashes), or pass --no-version-check.");
             Dump();
             return 6;
         }
+        if (VersionResult == 1)
+            VersionCheckOk = true;
 
         if (opt.CreateAccount)
         {
@@ -1615,6 +1629,7 @@ internal sealed class CrystalSession : IDisposable
             PlayGate();
 
         Dump();
+        Console.WriteLine($"VersionCheckOk={VersionCheckOk} VersionResult={VersionResult?.ToString() ?? "(none)"} src={VersionHashSource ?? "-"} md5={VersionHashHex ?? "-"}");
         Console.WriteLine($"LoginSuccess={LoginSuccess} NewCharacterOk={NewCharacterOk} NewCharacterResult={NewCharacterResult?.ToString() ?? "(none)"}");
         Console.WriteLine($"StartGameResult={StartGameResult?.ToString() ?? "(none)"} InMap={InMap} Map={MapFileName} Title={MapTitle} User={UserName} Loc={UserLocation.X},{UserLocation.Y} Objects={_objects.Count} WalkAck={WalkAck}");
         Console.WriteLine($"FightHit={FightHit} FightDied={FightDied} LootOk={LootOk} EquipOk={EquipOk}");

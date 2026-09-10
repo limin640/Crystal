@@ -266,6 +266,12 @@ Jev `mmapLib=101` is past the 4-image fixture, so draw uses the first decoded fr
 
 Operator pack: `--data /path/to/Crystal/Data` (do not vendor). Bake fixture catalog still lists MMap/MagIcon among the **86** missing slots.
 
+## Version hash (later)
+
+Same MD5-of-file as WinForms. Server `--version-path` / Client `--version-file` (default `Crystal.Client.Linux.dll`). `--no-version-check` is opt-out. Do not vendor `Mir2.Exe`.
+
+**Hard-gate** without `--no-version-check`, `CheckVersion=True`: **EXIT:0** — `VersionCheckOk=True` `Result=1`.
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon load only when the operator `--data` tree has those files. Do not vendor Sound packs; fixture wav is not game art. See `MIGRATION.md` residuals checklist.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon load only when the operator `--data` tree has those files. Do not vendor Sound packs; fixture wav is not game art. Version hash uses an operator file or this host's Linux client DLL. See `MIGRATION.md` residuals checklist.

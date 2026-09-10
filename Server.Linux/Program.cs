@@ -73,8 +73,9 @@ internal static class Program
         bool hasFullWorld = hasDb && mapFileCount > 0;
         bool askedListenWithoutWorld = args.Contains("--listen-without-world");
 
-        if (args.Contains("--no-version-check"))
-            Settings.CheckVersion = false;
+        string iniVersionPath = Settings.VersionPath;
+        bool iniCheckVersion = Settings.CheckVersion;
+        bool versionCli = ApplyVersionCli(args);
         if (args.Contains("--no-db-checks"))
             Settings.EnforceDBChecks = false;
         if (args.Contains("--allow-start-game"))
@@ -105,7 +106,15 @@ internal static class Program
 
         string worldMode = hasFullWorld ? "full" : (Settings.ListenWithoutWorld ? "handshake-only" : "incomplete");
         Console.WriteLine($"WorldMode={worldMode} Server.MirDB={(hasDb ? "present" : "MISSING")} Maps={mapFileCount}");
-        Console.WriteLine($"CheckVersion={Settings.CheckVersion} EnforceDBChecks={Settings.EnforceDBChecks} ListenWithoutWorld={Settings.ListenWithoutWorld} AllowStartGame={Settings.AllowStartGame} TestServer={Settings.TestServer}");
+        int hashCount = Settings.VersionHashes?.Count ?? 0;
+        Console.WriteLine($"CheckVersion={Settings.CheckVersion} VersionPath={Settings.VersionPath} hashes={hashCount} EnforceDBChecks={Settings.EnforceDBChecks} ListenWithoutWorld={Settings.ListenWithoutWorld} AllowStartGame={Settings.AllowStartGame} TestServer={Settings.TestServer}");
+        if (Settings.VersionHashes != null)
+        {
+            for (int i = 0; i < Settings.VersionHashes.Count; i++)
+                Console.WriteLine($"version-hash[{i}]={Convert.ToHexString(Settings.VersionHashes[i]).ToLowerInvariant()}");
+        }
+        if (Settings.CheckVersion && hashCount == 0)
+            Console.Error.WriteLine("CheckVersion=True but no hashes loaded — every C.ClientVersion will be rejected. Pass --version-path / --version-hashes, or --no-version-check.");
         Console.WriteLine($"Bind {Settings.IPAddress}:{Settings.Port}");
         Console.WriteLine($"Database {(File.Exists(Envir.DatabasePath) ? "present" : "MISSING (will be created empty if Start runs)")}: {Path.GetFullPath(Envir.DatabasePath)}");
 
@@ -159,6 +168,11 @@ internal static class Program
         DrainMessages();
         Envir.Main.Stop();
         DrainMessages();
+        if (versionCli)
+        {
+            Settings.VersionPath = iniVersionPath;
+            Settings.CheckVersion = iniCheckVersion;
+        }
         Settings.Save();
         Console.WriteLine("Server.Linux stopped.");
         return listening || Envir.Main.Running ? 0 : 3;
@@ -230,18 +244,22 @@ internal static class Program
             Usage (full world — Maps + Server.MirDB present, no --listen-without-world):
               dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
                 --root /path/to/Crystal.Database/Jev \
-                --no-version-check --allow-start-game --test-server --seconds 90
+                --version-path /path/to/Crystal.Client.Linux.dll --allow-start-game --test-server --seconds 90
 
             Handshake-only (empty / incomplete root):
               dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
                 --root /tmp/crystal-server-root \
-                --no-version-check --listen-without-world --seconds 20
+                --listen-without-world --seconds 20
 
             Options:
               --root <dir>              External DB root (Configs/Envir/Maps/Server.MirDB). Not vendored.
               --bind <ip>               Listen address (default 127.0.0.1 from Setup.ini)
               --port <n>                Game port (default 7000)
-              --no-version-check        Settings.CheckVersion=false (Linux client has no Mir2.Exe)
+              --version-path <files>    Settings.VersionPath (comma-separated). MD5 each file, or parse .md5/.hashes hex lists.
+                                        Env: CRYSTAL_VERSION_PATH. When hashes load, CheckVersion=true unless --no-version-check.
+              --version-hashes <hex,>   Extra MD5 hex entries (same 16-byte compare). Env: CRYSTAL_VERSION_HASHES.
+              --check-version           Settings.CheckVersion=true (Jev Setup.ini often has False).
+              --no-version-check        Settings.CheckVersion=false (opt-out). Not required when hashes match.
               --allow-start-game        Settings.AllowStartGame=true (StartGame Result 4; default in stock Jev Setup.ini)
               --test-server             Settings.TestServer=true — enables existing @LEVEL/@MOB/@MAKE/@MOVE (no invented commands)
               --listen-without-world    Bind 7000 even if maps/DB checks fail (handshake/login only).
@@ -255,6 +273,50 @@ internal static class Program
               git clone --depth 1 https://github.com/Suprcode/Crystal.Database.git /path/to/Crystal.Database
               # use /path/to/Crystal.Database/Jev as --root
             """);
+    }
+
+    /// <summary>
+    /// Same MD5-of-file (or hex list) as WinForms <c>Settings.LoadVersion</c> / <c>LoginScene.SendVersion</c>.
+    /// CLI overrides are not written back to operator Setup.ini.
+    /// </summary>
+    static bool ApplyVersionCli(string[] args)
+    {
+        bool touched = false;
+        string? path = GetOption(args, "--version-path") ?? Environment.GetEnvironmentVariable("CRYSTAL_VERSION_PATH");
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            Settings.VersionPath = path;
+            Settings.LoadVersion();
+            touched = true;
+        }
+
+        string? hexList = GetOption(args, "--version-hashes") ?? Environment.GetEnvironmentVariable("CRYSTAL_VERSION_HASHES");
+        if (!string.IsNullOrWhiteSpace(hexList))
+        {
+            foreach (string part in hexList.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!Settings.TryAddVersionHashHex(part))
+                    Console.Error.WriteLine($"version-hashes skip (need 32 hex chars): {part}");
+            }
+            touched = true;
+        }
+
+        int hashes = Settings.VersionHashes?.Count ?? 0;
+        if (hashes > 0 && !args.Contains("--no-version-check"))
+            Settings.CheckVersion = true;
+
+        if (args.Contains("--check-version"))
+        {
+            Settings.CheckVersion = true;
+            touched = true;
+        }
+        if (args.Contains("--no-version-check"))
+        {
+            Settings.CheckVersion = false;
+            touched = true;
+        }
+
+        return touched;
     }
 
     static string? GetOption(string[] args, string name)

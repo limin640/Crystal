@@ -98,13 +98,17 @@ When `Server.MirDB` exists **and** `Maps/*.map` files exist, Server.Linux starts
 # EXACT flags for StartGame / in-map (full external Jev root)
 dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
   --root /path/to/Crystal.Database/Jev \
-  --no-version-check --allow-start-game --seconds 90
+  --version-path /path/to/Client.Linux/bin/Release/net8.0/Crystal.Client.Linux.dll \
+  --allow-start-game --seconds 90
 ```
 
 | Flag | Effect |
 | --- | --- |
 | `--root <Jev>` | `chdir` to external `Configs/Envir/Maps/Server.MirDB`. Never a repo path. Env: `CRYSTAL_SERVER_ROOT`. Default if omitted: `/tmp/crystal-server-root` (throwaway). |
-| `--no-version-check` | `Settings.CheckVersion=false` (Linux has no `Mir2.Exe` hash). Stock Jev `Setup.ini` already has `CheckVersion=False`. |
+| `--version-path <files>` | `Settings.VersionPath` (comma-separated). MD5 each existing file, or parse `.md5` / `.hashes` hex lists. Env: `CRYSTAL_VERSION_PATH`. When at least one hash loads, `CheckVersion=true` unless `--no-version-check`. Do not vendor `Mir2.Exe`. |
+| `--version-hashes <hex,>` | Extra 32-char MD5 hex entries. Env: `CRYSTAL_VERSION_HASHES`. |
+| `--check-version` | Force `Settings.CheckVersion=true` (stock Jev `Setup.ini` has `False`). |
+| `--no-version-check` | Opt-out: `Settings.CheckVersion=false`. Not required when client and server hash the same file. |
 | `--allow-start-game` | `Settings.AllowStartGame=true`. Without this (and without `AdminAccount`), `S.StartGame.Result=0`. Stock Jev `Setup.ini` already has `AllowStartGame=True`; pass the flag anyway so a custom root cannot silently disable StartGame. |
 | `--test-server` | `Settings.TestServer=true`. Enables existing `@LEVEL` / `@MOB` / `@MAKE` / `@MOVE` so Client.Linux can script fight/loot/equip. |
 | `--listen-without-world` | Bind 7000 when maps/DB fail `CanStartEnvir` (login handshake only). **Ignored** when `Server.MirDB` + `*.map` exist. |
@@ -116,7 +120,7 @@ dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
 # handshake-only (empty / incomplete root — Phase C)
 dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
   --root /tmp/crystal-server-root \
-  --no-version-check --listen-without-world --seconds 20
+  --listen-without-world --seconds 20
 
 # bind-only (no Envir) to prove the port:
 dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
@@ -157,6 +161,8 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--input-step-ms` | Delay between injected commands (default 400) |
 | `--window` | Silk.NET OpenGL + keyboard/mouse after `--connect` (inventory/equip HUD on IRenderer) |
 | `--enter-wait-ms` | How long to wait for `MapInformation` / `UserInformation` |
+| `--version-file <path>` | File to MD5 for `C.ClientVersion` (`CRYSTAL_VERSION_FILE`). Same as WinForms hashing `Application.ExecutablePath`. Default: `Crystal.Client.Linux.dll`. Operator `Mir2.Exe` is hashed, not executed, and is not vendored. |
+| `--version-hash <hex>` | Send this 32-char MD5 instead of hashing a file (`CRYSTAL_VERSION_HASH`). Matches server `--version-hashes` / `.md5` lists. |
 
 `Client.Linux/Mir2Test.ini` is the Mir2Test.ini-style IP/port/account file.
 

@@ -89,7 +89,7 @@ WTL: v1 RLE + DXT-like 8-byte blocks and v2 zlib+DXT1/3/5 are decoded in softwar
 | Unit | Status |
 | --- | --- |
 | Server.Linux loads full external Jev root (`Configs/Envir/Maps/Server.MirDB`) | Done — `--root` + maps present ⇒ **no** `--listen-without-world` |
-| `--allow-start-game` / `--no-version-check` documented | Done — see BUILD.md |
+| `--allow-start-game` / version hash | Done — `--version-path` / `--version-file` keep `CheckVersion` on; `--no-version-check` is opt-out |
 | Client.Linux after LoginSuccess: character list / `NewCharacter` / `StartGame` | Done — Shared packets; GameScene-equivalent in-map state |
 | Map/object draw via bake catalog **or** existing `.Lib` through `IRenderer` | Done — `Crystal.Assets.Maps.MapReader` + `MapView` on OpenGL/Null |
 | Walk packet sent once in-map (evidence toward walk) | Done — one `C.Walk`; not a full input map |
@@ -101,7 +101,7 @@ Exact full-world flags (operator Jev tree **outside** git — never vendor DB/ma
 ```bash
 dotnet run --project Server.Linux/Server.Linux.csproj -c Release -- \
   --root /path/to/Crystal.Database/Jev \
-  --no-version-check --allow-start-game --seconds 90
+  --version-path /path/to/Crystal.Client.Linux.dll --allow-start-game --seconds 90
 
 dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
   --connect --ini Client.Linux/Mir2Test.ini --headless \
@@ -113,7 +113,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 
 ### Evidence (this agent, external Jev at `/tmp/Crystal.Database/Jev` — not in git)
 
-Server (`--root …/Jev --no-version-check --allow-start-game`, **no** `--listen-without-world`):
+Server (`--root …/Jev --version-path …/Crystal.Client.Linux.dll --allow-start-game`, **no** `--listen-without-world`):
 
 ```
 WorldMode=full Server.MirDB=present Maps=1698
@@ -558,6 +558,25 @@ hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapIndex=0 magIndex
 
 Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame (`mmapIndex=0`). Warrior has no `ClientMagic`; skill slot 0 probes `MagIcon[0]` (`magDraws=1`). Operator `--data` with a real pack uses the same parse+draw path.
 
+### Version hash (2026-09-10, same VM)
+
+WinForms `LoginScene.SendVersion` MD5s `Application.ExecutablePath`. Server `Settings.LoadVersion` MD5s each `VersionPath` file (default `.\Mir2.Exe`) and `MirConnection.ClientVersion` compares `C.ClientVersion.VersionHash` when `CheckVersion` is true.
+
+Linux uses the same MD5-of-file (or a `.md5` / `.hashes` hex list). Do **not** vendor `Mir2.Exe`.
+
+| Side | Flag / env | Default |
+| --- | --- | --- |
+| Server.Linux | `--version-path` / `CRYSTAL_VERSION_PATH` | Setup.ini `VersionPath` (often missing `Mir2.Exe`) |
+| Server.Linux | `--version-hashes` / `CRYSTAL_VERSION_HASHES` | none |
+| Client.Linux | `--version-file` / `CRYSTAL_VERSION_FILE` | `Crystal.Client.Linux.dll` (this host) |
+| Client.Linux | `--version-hash` / `CRYSTAL_VERSION_HASH` | none |
+
+When hashes load, Server.Linux sets `CheckVersion=true` unless `--no-version-check`. CLI overrides are not written back to operator `Setup.ini`.
+
+Local pair (no Windows exe on the box): both sides hash `Client.Linux/bin/Release/net8.0/Crystal.Client.Linux.dll`. Operator with a real `Mir2.Exe`: point both flags at that file (hash only).
+
+**Hard-gate** Server **without** `--no-version-check`, with `--version-path` + Client default file: **EXIT:0** — `CheckVersion=True` `VersionCheckOk=True` `Result=1`.
+
 ## Remaining residuals (checklist)
 
 These do **not** block the hard-gate (login→select→walk→fight→loot→equip **EXIT:0**). Do not invent WIL/game art to close them.
@@ -568,7 +587,7 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [x] **`MMap.Lib` / MagIcon tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Skip when absent (`MMapOk=False`). Leftover: no big-map dialog, no MagIcon2 skill-book / targeting, no invented tiles. Operator Data stays outside git.
 - [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
-- [ ] **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
+- [x] **Version hash** — same MD5-of-file as WinForms `LoginScene.SendVersion` / `Settings.LoadVersion`. Server `--version-path` / `CRYSTAL_VERSION_PATH` (file or `.md5` / `.hashes` list) + Client `--version-file` / `CRYSTAL_VERSION_FILE` (default: this host's `Crystal.Client.Linux.dll`). `--no-version-check` remains an opt-out. Do not vendor `Mir2.Exe`. Leftover: a Windows server that only lists `Mir2.Exe` needs the operator to add the Linux client hash or point Linux `--version-file` at that exe.
 - [ ] **Operator art / Data / Jev / Sound packs** — stay outside git. `--data` / `--maps` / `--sound` / `--root` point at external trees. Do not vendor bake atlases.
 
 The login→select→walk→fight→loot→equip **verbs** stay evidenced (do not regress). Input/HUD is the next fold toward GameScene, not a replacement of that proof.
