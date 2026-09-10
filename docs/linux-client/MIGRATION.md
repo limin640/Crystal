@@ -692,9 +692,37 @@ WinForms `BigMapDialog` uses `Libraries.Title` Index **820** (also 827/824/821 b
 
 Jev `Configs/WorldMap.ini` is `Enabled=False` with an empty Layout. Server `--world-map-enabled` sets `WorldMapSetup.Enabled=true` for the process only (not written back) and does **not** invent Button icons.
 
-**Hard-gate** `--connect --headless` (no `--data`, WorldMap closed): **EXIT:0** — `TitleOk=False` `Prguse2Ok=False` titleDraws=0 prg2Draws=0.
+**Hard-gate** `--connect --headless` (no `--data`, WorldMap closed): **EXIT:0**
 
-**Smoke** `--data` (`init-sample` or operator Data): **EXIT:0** — `TitleOk=True` `Prguse2Ok=True` titleDraws≥1 prg2Draws≥1.
+```
+hud-lib Title file=Title.Lib ok=True images=2 src=catalog
+hud-lib skip Prguse2.Lib: missing (no --data / catalog sprite)
+hud-lib ready TitleOk=True Prguse2Ok=False images=0/0/0/0/2/0
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58652 by self
+  loot  : PickUp ground (HP)DrugSmall at 289,610 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=1
+hud world: open=False WorldMapOk=False
+hud chrome: TitleOk=True Prguse2Ok=False titleDraws=1 prg2Draws=0 titleSrc=catalog
+```
+
+Bake fixture catalog already has two Title sprites (not invented this increment). Prguse2 is not in that catalog, so it skips without `--data`. WorldMap stayed closed.
+
+**Smoke** `--connect --headless --data /tmp/crystal-mmap-sample` (`crystal-bake init-sample`, WorldMap closed): **EXIT:0**
+
+```
+hud-lib Title file=Title.Lib ok=True images=2 src=/tmp/crystal-mmap-sample/Title.Lib
+hud-lib Prguse2 file=Prguse2.Lib ok=True images=4 src=/tmp/crystal-mmap-sample/Prguse2.Lib
+hud-lib ready TitleOk=True Prguse2Ok=True images=4/4/4/4/2/4
+FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=58655 by self
+hud world: open=False WorldMapOk=False
+hud chrome: TitleOk=True Prguse2Ok=True titleDraws=1 prg2Draws=1 titleIndex=0 prg2Index=0 titleSrc=/tmp/crystal-mmap-sample/Title.Lib prg2Src=/tmp/crystal-mmap-sample/Prguse2.Lib
+```
+
+Fixture Title/Prguse2 have 2/4 images, so WinForms indices 820/1360 fall back to the first decoded frame (`titleIndex=0` `prg2Index=0`). An operator Data pack with real `Title.Lib` / `Prguse2.Lib` uses the same path and can hit those indices exactly. Do not vendor the pack.
+
+**Case-fold** `--data /tmp/crystal-mmap-case` (`title.Lib` / `prguse2.Lib`): **EXIT:0** — `TitleOk=True` `Prguse2Ok=True` src=`…/title.Lib` / `…/prguse2.Lib`.
 
 ### Version hash (2026-09-10, same VM)
 
