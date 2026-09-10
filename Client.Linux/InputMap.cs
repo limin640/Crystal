@@ -263,7 +263,6 @@ internal static class InputMap
         if (t.Equals("BigMap", StringComparison.OrdinalIgnoreCase)
             || t.StartsWith("BigMap:", StringComparison.OrdinalIgnoreCase)
             || t.Equals("FieldMap", StringComparison.OrdinalIgnoreCase)
-            || t.Equals("WorldMap", StringComparison.OrdinalIgnoreCase)
             || t.Equals("B", StringComparison.OrdinalIgnoreCase))
         {
             string mode = "";
@@ -271,6 +270,44 @@ internal static class InputMap
             if (colon >= 0 && colon + 1 < t.Length)
                 mode = t[(colon + 1)..].Trim();
             command = GameCommand.BigMap(mode);
+            return true;
+        }
+
+        if (t.Equals("WorldMap", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("WorldMap:", StringComparison.OrdinalIgnoreCase))
+        {
+            string mode = "";
+            int colon = t.IndexOf(':');
+            if (colon >= 0 && colon + 1 < t.Length)
+                mode = t[(colon + 1)..].Trim();
+            command = GameCommand.WorldMap(mode);
+            return true;
+        }
+
+        if (t.Equals("SearchMap", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("SearchMap:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("MapSearch:", StringComparison.OrdinalIgnoreCase))
+        {
+            int colon = t.IndexOf(':');
+            string q = colon >= 0 && colon + 1 < t.Length ? t[(colon + 1)..].Trim() : "";
+            q = q.Replace('_', ' ');
+            if (q.Length == 0) return false;
+            command = GameCommand.SearchMap(q);
+            return true;
+        }
+
+        if (t.Equals("TeleportNpc", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("TeleportNpc:", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("TeleportToNPC", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("TeleportToNPC:", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("Teleport", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Teleport:", StringComparison.OrdinalIgnoreCase))
+        {
+            int id = 0;
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+                int.TryParse(t[(colon + 1)..].Trim(), out id);
+            command = GameCommand.TeleportNpc(id);
             return true;
         }
 

@@ -28,7 +28,10 @@ internal enum GameCommandKind
     QuestShare,
     Mag,
     MagTarget,
-    BigMap
+    BigMap,
+    WorldMap,
+    SearchMap,
+    TeleportNpc
 }
 
 internal readonly struct GameCommand
@@ -67,4 +70,10 @@ internal readonly struct GameCommand
     public static GameCommand MagTarget(string spell = "", int targetId = 0) => new() { Kind = GameCommandKind.MagTarget, Text = spell ?? "", Slot = 0, Dest = targetId };
     /// <summary>Toggle WinForms-style big-map chrome (<c>KeybindOptions.Bigmap</c> / B).</summary>
     public static GameCommand BigMap(string mode = "") => new() { Kind = GameCommandKind.BigMap, Text = mode ?? "", Slot = 0 };
+    /// <summary>World-map overlay inside the big-map dialog (WinForms <c>OpenWorldMap</c>).</summary>
+    public static GameCommand WorldMap(string mode = "") => new() { Kind = GameCommandKind.WorldMap, Text = mode ?? "", Slot = 0 };
+    /// <summary><c>C.SearchMap</c> — query in <see cref="Text"/> (server requires length ≥ 3).</summary>
+    public static GameCommand SearchMap(string text) => new() { Kind = GameCommandKind.SearchMap, Text = text ?? "", Slot = 0 };
+    /// <summary><c>C.TeleportToNPC</c> — optional ObjectID in <see cref="Dest"/>; otherwise first <c>CanTeleportTo</c> NPC.</summary>
+    public static GameCommand TeleportNpc(int objectId = 0) => new() { Kind = GameCommandKind.TeleportNpc, Text = "", Slot = 0, Dest = objectId };
 }

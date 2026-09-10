@@ -84,6 +84,7 @@ internal sealed class SceneHud : IDisposable
         DrawChatLog(16, height - 176, session);
         DrawNpcPanel(270, 56, session);
         DrawBigMap(width, height, session, mapView);
+        DrawWorldOverlay(width, height, session);
 
         int barW = Math.Min(220, width / 3);
         int hp = session.UserHP;
@@ -112,6 +113,9 @@ internal sealed class SceneHud : IDisposable
         Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex}");
         Console.WriteLine($"hud mmap: MMapOk={_libs?.MMapOk ?? false} MagIconOk={_libs?.MagIconOk ?? false} MagIcon2Ok={_libs?.MagIcon2Ok ?? false} mmapDraws={_libs?.MMapTileDraws ?? 0} magDraws={_libs?.MagIconTileDraws ?? 0} mag2Draws={_libs?.MagIcon2TileDraws ?? 0} mmapIndex={_libs?.MMapDrawIndex ?? -1} magIndex={_libs?.MagIconDrawIndex ?? -1} mag2Index={_libs?.MagIcon2DrawIndex ?? -1} mmapSrc={_libs?.MMapSource ?? "-"} magSrc={_libs?.MagIconSource ?? "-"} mag2Src={_libs?.MagIcon2Source ?? "-"} images={_libs?.MMapImages ?? 0}/{_libs?.MagIconImages ?? 0}/{_libs?.MagIcon2Images ?? 0}");
         Console.WriteLine($"hud bigmap: open={session.BigMapOpen} BigMapOk={session.BigMapOk} draws={session.BigMapDraws} blips={session.BigMapBlips} mmap={session.BigMapMmapDrawn} index={session.BigMapIndex} mini={session.MiniMapIndex} size={session.MapWidth}x{session.MapHeight} src={_libs?.MMapSource ?? "-"}");
+        Console.WriteLine($"hud world: open={session.WorldMapOpen} WorldMapOk={session.WorldMapOk} MapLinkIconOk={_libs?.MapLinkIconOk ?? false} icons={session.WorldMapIconCount} drawn={session.WorldMapIconsDrawn} draws={session.WorldMapDraws} enabled={session.WorldMapEnabled} src={_libs?.MapLinkIconSource ?? "-"} images={_libs?.MapLinkIconImages ?? 0}");
+        Console.WriteLine($"hud search: SearchMapOk={session.SearchMapOk} q={session.SearchQuery ?? "-"} map={session.SearchMapIndex} npc={session.SearchNpcIndex} searches={session.InputSearches}");
+        Console.WriteLine($"hud teleport: TeleportOk={session.TeleportOk} id={session.SelectedNpcId} name={session.SelectedNpcName ?? "-"} cost={session.TeleportToNpcCost} gold={session.UserGold} teleports={session.InputTeleports} can={session.MapNpcs.Count(n => n.CanTeleportTo)}");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
         Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count} gold={session.UserGold} bag={session.BagCount} buys={session.InputBuys} sells={session.InputSells} BuyOk={session.BuyOk} SellOk={session.SellOk}");
         Console.WriteLine($"hud quest: info={session.QuestCatalog.Count} taken={session.TakenQuests.Count} done={session.CompletedQuestIds.Count} accepts={session.InputQuests} AcceptOk={session.QuestAcceptOk} FinishOk={session.QuestFinishOk}");
@@ -429,10 +433,74 @@ internal sealed class SceneHud : IDisposable
                 Blip(obj.Location.X, obj.Location.Y, color, 2);
             }
             Blip(session.UserLocation.X, session.UserLocation.Y, Color.Yellow, 5);
+
+            foreach (var move in session.MapMoves)
+            {
+                int px = ox + (int)(move.Location.X / (float)mw * innerW) - 4;
+                int py = oy + (int)(move.Location.Y / (float)mh * innerH) - 4;
+                if (!_libs?.TryDrawMapLinkIcon(move.Icon, px, py, 8, 8) ?? true)
+                    Fill(px, py, 8, 8, Color.FromArgb(220, 200, 160, 48));
+            }
+
+            foreach (var npc in session.MapNpcs.Where(n => n.ShowOnBigMap || n.CanTeleportTo).Take(12))
+            {
+                int px = ox + (int)(npc.Location.X / (float)mw * innerW) - 4;
+                int py = oy + (int)(npc.Location.Y / (float)mh * innerH) - 4;
+                int icon = npc.Icon != 0 ? npc.Icon : npc.BigMapIcon;
+                if (!_libs?.TryDrawMapLinkIcon(icon, px, py, 8, 8) ?? true)
+                    Fill(px, py, 8, 8, npc.CanTeleportTo ? Color.MediumOrchid : Color.CadetBlue);
+            }
         }
+
+        if (session.SearchMapOk)
+            Text(x + 80, y + panelH - 14, $"FIND {session.SearchQuery} → map={session.SearchMapIndex} npc={session.SearchNpcIndex}", Color.Khaki);
 
         BigMapDraws = HudDraws - before;
         session.MarkBigMapDraw(BigMapDraws, BigMapBlips, mmapTile);
+    }
+
+    /// <summary>
+    /// WinForms world overlay uses Prguse2 frames 1360/1365/1366 plus MapLinkIcon buttons.
+    /// Linux draws quad chrome (no invented Prguse2) and MapLinkIcon frames when <c>--data</c> has them.
+    /// </summary>
+    void DrawWorldOverlay(int width, int height, CrystalSession session)
+    {
+        if (!session.WorldMapOpen)
+        {
+            session.MarkWorldMapDraw(0, 0);
+            return;
+        }
+
+        int before = HudDraws;
+        int panelW = Math.Min(640, Math.Max(320, width - 48));
+        int panelH = Math.Min(400, Math.Max(220, height - 96));
+        int x = (width - panelW) / 2;
+        int y = 48;
+        Fill(x + 12, y + 22, panelW - 24, panelH - 44, Color.FromArgb(200, 16, 20, 28));
+        Text(x + 20, y + 26, "WORLD", Color.Gold);
+        Text(x + 80, y + 26, session.WorldMapEnabled ? "ON" : "OFF", session.WorldMapEnabled ? Color.PaleGreen : Color.Gray);
+        Text(x + panelW - 180, y + 26, $"icons={session.WorldMapIconCount} cost={session.TeleportToNpcCost}", Color.Gainsboro);
+
+        int iconsDrawn = 0;
+        var icons = session.WorldIcons;
+        int cols = Math.Max(1, (panelW - 40) / 72);
+        for (int i = 0; i < icons.Count && i < 16; i++)
+        {
+            var icon = icons[i];
+            int cx = x + 20 + (i % cols) * 72;
+            int cy = y + 46 + (i / cols) * 28;
+            bool tile = _libs != null && _libs.TryDrawMapLinkIcon(icon.ImageIndex, cx, cy, 16, 16);
+            if (!tile)
+                Fill(cx, cy, 16, 16, Color.FromArgb(220, 72, 56, 96));
+            Text(cx + 18, cy + 2, Clip(string.IsNullOrWhiteSpace(icon.Title) ? $"M{icon.MapIndex}" : icon.Title, 8), Color.White);
+            iconsDrawn++;
+        }
+
+        if (icons.Count == 0)
+            Text(x + 20, y + 48, "no WorldMap.ini icons (packet arrived)", Color.DimGray);
+
+        int draws = HudDraws - before;
+        session.MarkWorldMapDraw(draws, iconsDrawn);
     }
 
     void DrawEquipPanel(int x, int y, CrystalSession session)

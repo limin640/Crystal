@@ -201,7 +201,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Inventory bag move (`C.MoveItem` / `C.MergeItem`) | **In progress** — `--input-script Drag:0,8` / `Merge:from,to`; HUD slot refresh. Same packets as `MirItemCell` |
 | Mouse-drag chrome (SelectedCell ghost / click-to-drop) | **In progress** — IRenderer colored-quad ghost + source/dest highlight on `Drag`. Windowed left-click pick/drop on bag/belt if Silk.NET mouse coords exist. Headless keeps `Drag:from,to` tokens. **No WIL item icons** |
 | Magic targeting / skill icons (`MagIcon` / `MagIcon2`) | **In progress** — both libs via `DataPath` + `IRenderer` when `--data` has them. Skill-book chrome uses `MagIcon2` at `Icon * 2` (WinForms `MagicButton`). `--input-script Mag` / `MagTarget` → `C.Magic` (`SpellTargetLock` on MagTarget). Warrior with no learned spell still sends; `S.Magic` is optional |
-| Mini-map WIL (`MMap.Lib`) / big map | **In progress** — `MMap.Lib` when `--data` has the file; skip when absent (no invented map art). Big-map chrome: `--input-script BigMap` / windowed B. MapReader size + `MMap.Lib` frames (`MapInformation.BigMap`, else MiniMap). Leftover: world-map overlay (`Prguse2` / `MapLinkIcon`), NPC teleport, `SearchMap` chrome |
+| Mini-map WIL (`MMap.Lib`) / big map | **In progress** — `MMap.Lib` when `--data` has the file; skip when absent (no invented map art). Big-map chrome: `--input-script BigMap` / windowed B. World overlay: `WorldMap` + `MapLinkIcon.Lib` (quads if Title/Prguse2 missing). `SearchMap:text` → `C.SearchMap`. `TeleportNpc` → `C.TeleportToNPC` when `CanTeleportTo` |
 | CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
 | **Audio** | **In progress** — `Crystal.Audio` `IAudio`: Null (headless), Silk.NET OpenAL on Linux, **NAudio backend** on Windows. `SoundManager` is the GameScene index API and calls through `IAudio` (`AudioFactory.CreateNAudio()`). `--play-sound` / `--sound` / `CRYSTAL_SOUND`. Fixture `Tools/Crystal.Audio/fixtures/tone.wav` (not game art). Do not vendor the Sound pack |
@@ -646,6 +646,16 @@ Jev `big=101` is past the 4-image fixture, so the MMap draw falls back to the fi
 
 **Case-fold** `--data /tmp/crystal-mmap-case --input-script BigMap` (`mmap.Lib` only): **EXIT:0** — `BigMapOk=True` draws=70 mmap=True `src=/tmp/crystal-mmap-case/mmap.Lib`.
 
+### World overlay / SearchMap / TeleportToNPC (2026-09-10, same VM)
+
+WinForms world overlay draws Prguse2 frames 1360/1365/1366 plus `Libraries.MapLinkIcon` buttons from `S.WorldMapSetupInfo`. Search box sends `C.SearchMap` (length ≥ 3); `S.SearchMapResult` retargets the dialog. Teleport button sends `C.TeleportToNPC` when `ClientNPCInfo.CanTeleportTo` (gold = `TeleportToNPCCost`).
+
+Client.Linux binds `MapLinkIcon.Lib` via case-insensitive `DataPath` (skip when absent). World overlay is quad chrome — **no invented Prguse2 / Title frames**. `--input-script WorldMap` / `SearchMap:text` / `TeleportNpc` / `Teleport:id`. Jev `Configs/WorldMap.ini` is `Enabled=False` with no layout icons; the packet still arrives.
+
+**Hard-gate** (no `--data`, overlay closed): **EXIT:0** — `MapLinkIconOk=False` `WorldMapOk=False` `SearchMapOk=False` `TeleportOk=False`.
+
+**Smoke** `--data` + `WorldMap,SearchMap:Bic,TeleportNpc`: **EXIT:0** — `MapLinkIconOk=True` when the file is present; `SearchMapOk` from `S.SearchMapResult`; `TeleportOk` only if a `CanTeleportTo` NPC exists (else skip, still EXIT:0).
+
 ### Version hash (2026-09-10, same VM)
 
 WinForms `LoginScene.SendVersion` MD5s `Application.ExecutablePath`. Server `Settings.LoadVersion` MD5s each `VersionPath` file (default `.\Mir2.Exe`) and `MirConnection.ClientVersion` compares `C.ClientVersion.VersionHash` when `CheckVersion` is true.
@@ -687,7 +697,8 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **WebView2** — Windows-only (WinForms Evergreen; no Linux runtime). Permanently deferred on Linux. `Client.Linux` must never reference it.
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
 - [x] **`MMap.Lib` / MagIcon / MagIcon2 tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Linux open is case-insensitive. MagIcon2 is the skill-book sheet (`MagicButton` / `AssignKeyPanel`). `--input-script Mag` / `MagTarget` send `C.Magic`. Skip when absent (`MagIcon2Ok=False`). Leftover: no WinForms skill-book keybind panel / full targeting cursor. Operator Data stays outside git.
-- [x] **Big-map dialog** — IRenderer chrome toggled by `--input-script BigMap` / windowed B (`KeybindOptions.Bigmap`). MapReader size + `MMap.Lib` at `MapInformation.BigMap` when `--data` has the file. `C.RequestMapInfo` on open. Skip draw when closed (`BigMapOk=False`). Leftover: world-map overlay (`Prguse2` / `MapLinkIcon`), `SearchMap` chrome, `TeleportToNPC`.
+- [x] **Big-map dialog** — IRenderer chrome toggled by `--input-script BigMap` / windowed B (`KeybindOptions.Bigmap`). MapReader size + `MMap.Lib` at `MapInformation.BigMap` when `--data` has the file. `C.RequestMapInfo` on open. Skip draw when closed (`BigMapOk=False`).
+- [x] **World overlay / SearchMap / TeleportToNPC** — `MapLinkIcon.Lib` via case-insensitive `DataPath` when present (quad chrome if Prguse2/Title frames missing; no invented world art). `--input-script WorldMap` / `SearchMap:text` / `TeleportNpc`. `S.WorldMapSetupInfo` / `S.SearchMapResult` / `S.LoseGold` logged. Jev `WorldMap.ini` is `Enabled=False` with no icons — overlay still draws packet chrome. Leftover: WinForms Prguse2 world bitmap.
 - [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [x] **Version hash** — same MD5-of-file as WinForms `LoginScene.SendVersion` / `Settings.LoadVersion`. Server `--version-path` / `CRYSTAL_VERSION_PATH` (file or `.md5` / `.hashes` list) + Client `--version-file` / `CRYSTAL_VERSION_FILE` (default: this host's `Crystal.Client.Linux.dll`). `--no-version-check` remains an opt-out. Do not vendor `Mir2.Exe`. Leftover: a Windows server that only lists `Mir2.Exe` needs the operator to add the Linux client hash or point Linux `--version-file` at that exe.

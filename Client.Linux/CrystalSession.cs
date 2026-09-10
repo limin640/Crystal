@@ -109,6 +109,34 @@ internal sealed class CrystalSession : IDisposable
     public int BigMapBlips { get; private set; }
     public string? BigMapEvidence { get; private set; }
     public int MapInfoNpcCount { get; private set; }
+    public bool WorldMapOpen { get; private set; }
+    public bool WorldMapEnabled { get; private set; }
+    public int WorldMapIconCount { get; private set; }
+    public int InputWorldMaps { get; private set; }
+    public bool WorldMapOk { get; private set; }
+    public int WorldMapDraws { get; private set; }
+    public int WorldMapIconsDrawn { get; private set; }
+    public string? WorldMapEvidence { get; private set; }
+    public int TeleportToNpcCost { get; private set; }
+    public int InputSearches { get; private set; }
+    public bool SearchMapOk { get; private set; }
+    public string? SearchQuery { get; private set; }
+    public int SearchMapIndex { get; private set; } = -1;
+    public uint SearchNpcIndex { get; private set; }
+    public string? SearchEvidence { get; private set; }
+    public int InputTeleports { get; private set; }
+    public bool TeleportOk { get; private set; }
+    public string? TeleportEvidence { get; private set; }
+    public uint SelectedNpcId { get; private set; }
+    public string? SelectedNpcName { get; private set; }
+    readonly List<ClientNPCInfo> _mapNpcs = new();
+    readonly List<ClientMovementInfo> _mapMoves = new();
+    readonly List<WorldMapIcon> _worldIcons = new();
+    bool _pendingTeleport;
+    uint _pendingTeleportGold;
+    public IReadOnlyList<ClientNPCInfo> MapNpcs => _mapNpcs;
+    public IReadOnlyList<ClientMovementInfo> MapMoves => _mapMoves;
+    public IReadOnlyList<WorldMapIcon> WorldIcons => _worldIcons;
     public bool ChatComposing { get; private set; }
     public string ChatDraft { get; private set; } = "";
     string _lastSentChat = "";
@@ -307,6 +335,15 @@ internal sealed class CrystalSession : IDisposable
             case GameCommandKind.BigMap:
                 TryBigMap(command.Text);
                 break;
+            case GameCommandKind.WorldMap:
+                TryWorldMap(command.Text);
+                break;
+            case GameCommandKind.SearchMap:
+                TrySearchMap(command.Text);
+                break;
+            case GameCommandKind.TeleportNpc:
+                TryTeleportNpc(command.Dest);
+                break;
         }
     }
 
@@ -328,7 +365,7 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} quests={InputQuests} mags={InputMags} bigmaps={InputBigMaps} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} QuestAcceptOk={QuestAcceptOk} QuestFinishOk={QuestFinishOk} MagicOk={MagicOk} BigMapOpen={BigMapOpen} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} quests={InputQuests} mags={InputMags} bigmaps={InputBigMaps} worlds={InputWorldMaps} searches={InputSearches} teleports={InputTeleports} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} QuestAcceptOk={QuestAcceptOk} QuestFinishOk={QuestFinishOk} MagicOk={MagicOk} BigMapOpen={BigMapOpen} WorldMapOpen={WorldMapOpen} SearchMapOk={SearchMapOk} TeleportOk={TeleportOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
         if (BuyEvidence != null) Console.WriteLine($"  buy : {BuyEvidence}");
         if (SellEvidence != null) Console.WriteLine($"  sell : {SellEvidence}");
         if (TradeEvidence != null) Console.WriteLine($"  trade : {TradeEvidence}");
@@ -338,6 +375,9 @@ internal sealed class CrystalSession : IDisposable
         if (QuestFinishEvidence != null) Console.WriteLine($"  quest-finish : {QuestFinishEvidence}");
         if (MagicEvidence != null) Console.WriteLine($"  mag : {MagicEvidence}");
         if (BigMapEvidence != null) Console.WriteLine($"  bigmap : {BigMapEvidence}");
+        if (WorldMapEvidence != null) Console.WriteLine($"  world : {WorldMapEvidence}");
+        if (SearchEvidence != null) Console.WriteLine($"  search : {SearchEvidence}");
+        if (TeleportEvidence != null) Console.WriteLine($"  teleport : {TeleportEvidence}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
@@ -369,6 +409,12 @@ internal sealed class CrystalSession : IDisposable
         bool wantBigMapOpen = commands.Any(c => c.Kind == GameCommandKind.BigMap && !IsBigMapClose(c.Text));
         bool wantBigMapClose = commands.Any(c => c.Kind == GameCommandKind.BigMap && IsBigMapClose(c.Text));
         if (wantBigMapOpen && !wantBigMapClose && !BigMapOpen) return 10;
+        bool wantWorld = commands.Any(c => c.Kind == GameCommandKind.WorldMap);
+        if (wantWorld && InputWorldMaps == 0) return 10;
+        bool wantSearch = commands.Any(c => c.Kind == GameCommandKind.SearchMap);
+        if (wantSearch && InputSearches == 0) return 10;
+        bool wantTeleport = commands.Any(c => c.Kind == GameCommandKind.TeleportNpc);
+        if (wantTeleport && InputTeleports == 0) return 10;
         return 0;
     }
 
@@ -819,6 +865,93 @@ internal sealed class CrystalSession : IDisposable
         return m is "off" or "close" or "hide";
     }
 
+    /// <summary>WinForms <c>OpenWorldMap</c> — overlay inside the big-map dialog. No invented Prguse2 frames.</summary>
+    void TryWorldMap(string mode)
+    {
+        InputWorldMaps++;
+        bool open = mode.Trim().ToLowerInvariant() switch
+        {
+            "off" or "close" or "hide" => false,
+            "on" or "open" or "show" => true,
+            _ => !WorldMapOpen
+        };
+        WorldMapOpen = open;
+        if (open)
+        {
+            BigMapOpen = true;
+            if (MapIndex > 0)
+            {
+                Send(new C.RequestMapInfo { MapIndex = MapIndex });
+                Pump(400);
+            }
+        }
+        else
+            Pump(200);
+        WorldMapEvidence = $"open={WorldMapOpen} enabled={WorldMapEnabled} icons={WorldMapIconCount} cost={TeleportToNpcCost}";
+        Note($"input WorldMap {WorldMapEvidence} #{InputWorldMaps}");
+    }
+
+    /// <summary>Same <c>C.SearchMap</c> as WinForms search box (server requires length ≥ 3).</summary>
+    void TrySearchMap(string text)
+    {
+        InputSearches++;
+        SearchQuery = text ?? "";
+        SearchMapOk = false;
+        SearchMapIndex = -1;
+        SearchNpcIndex = 0;
+        Send(new C.SearchMap { Text = SearchQuery });
+        SearchEvidence = $"C.SearchMap q={SearchQuery}";
+        Note($"input SearchMap {SearchEvidence} #{InputSearches}");
+        Pump(600);
+    }
+
+    /// <summary>Same <c>C.TeleportToNPC</c> as WinForms when the selected NPC has <c>CanTeleportTo</c>.</summary>
+    void TryTeleportNpc(int objectId)
+    {
+        InputTeleports++;
+        ClientNPCInfo? npc = null;
+        if (objectId > 0)
+            npc = _mapNpcs.FirstOrDefault(n => n.ObjectID == (uint)objectId)
+                  ?? new ClientNPCInfo { ObjectID = (uint)objectId, Name = $"id:{objectId}", CanTeleportTo = true };
+        else if (SelectedNpcId != 0)
+            npc = _mapNpcs.FirstOrDefault(n => n.ObjectID == SelectedNpcId);
+        npc ??= _mapNpcs.FirstOrDefault(n => n.CanTeleportTo);
+
+        if (npc == null || npc.ObjectID == 0)
+        {
+            TeleportEvidence = $"skip no CanTeleportTo npcs={_mapNpcs.Count} cost={TeleportToNpcCost}";
+            Note($"input TeleportNpc {TeleportEvidence} #{InputTeleports}");
+            Pump(200);
+            return;
+        }
+
+        if (!npc.CanTeleportTo && objectId <= 0)
+        {
+            TeleportEvidence = $"skip name={npc.Name} id={npc.ObjectID} CanTeleportTo=False";
+            Note($"input TeleportNpc {TeleportEvidence} #{InputTeleports}");
+            Pump(200);
+            return;
+        }
+
+        SelectedNpcId = npc.ObjectID;
+        SelectedNpcName = npc.Name;
+        _pendingTeleport = true;
+        _pendingTeleportGold = UserGold;
+        Send(new C.TeleportToNPC { ObjectID = npc.ObjectID });
+        TeleportEvidence = $"C.TeleportToNPC id={npc.ObjectID} name={npc.Name} can={npc.CanTeleportTo} gold={UserGold} cost={TeleportToNpcCost}";
+        Note($"input TeleportNpc {TeleportEvidence} #{InputTeleports}");
+        Pump(800);
+    }
+
+    public void MarkWorldMapDraw(int draws, int iconsDrawn)
+    {
+        WorldMapDraws = draws;
+        WorldMapIconsDrawn = iconsDrawn;
+        WorldMapOk = WorldMapOpen && draws > 0;
+        if (WorldMapOpen)
+            WorldMapEvidence = $"open={WorldMapOpen} WorldMapOk={WorldMapOk} draws={draws} icons={iconsDrawn}/{WorldMapIconCount} enabled={WorldMapEnabled}";
+    }
+
     public void MarkBigMapDraw(int draws, int blips, bool mmapTile)
     {
         BigMapDraws = draws;
@@ -1227,14 +1360,38 @@ internal sealed class CrystalSession : IDisposable
                 if (nmi.Info.Height > 0) MapHeight = nmi.Info.Height;
                 if (nmi.Info.BigMap > 0) BigMapIndex = (ushort)nmi.Info.BigMap;
                 if (!string.IsNullOrWhiteSpace(nmi.Info.Title)) MapTitle = nmi.Info.Title;
-                MapInfoNpcCount = nmi.Info.NPCs?.Count ?? 0;
-                Note($"NewMapInfo index={nmi.MapIndex} title={nmi.Info.Title} size={nmi.Info.Width}x{nmi.Info.Height} big={nmi.Info.BigMap} npcs={MapInfoNpcCount} moves={nmi.Info.Movements?.Count ?? 0}");
+                _mapNpcs.Clear();
+                _mapMoves.Clear();
+                if (nmi.Info.NPCs != null)
+                    _mapNpcs.AddRange(nmi.Info.NPCs);
+                if (nmi.Info.Movements != null)
+                    _mapMoves.AddRange(nmi.Info.Movements);
+                MapInfoNpcCount = _mapNpcs.Count;
+                int canTp = _mapNpcs.Count(n => n.CanTeleportTo);
+                Note($"NewMapInfo index={nmi.MapIndex} title={nmi.Info.Title} size={nmi.Info.Width}x{nmi.Info.Height} big={nmi.Info.BigMap} npcs={MapInfoNpcCount} canTeleport={canTp} moves={_mapMoves.Count}");
                 break;
             case S.WorldMapSetupInfo wms:
-                Note($"WorldMapSetup enabled={wms.Setup?.Enabled == true} icons={wms.Setup?.Icons?.Count ?? 0} teleportCost={wms.TeleportToNPCCost} (Prguse2/MapLinkIcon overlay leftover)");
+                _worldIcons.Clear();
+                WorldMapEnabled = wms.Setup?.Enabled == true;
+                if (wms.Setup?.Icons != null)
+                    _worldIcons.AddRange(wms.Setup.Icons);
+                WorldMapIconCount = _worldIcons.Count;
+                TeleportToNpcCost = wms.TeleportToNPCCost;
+                WorldMapEvidence = $"WorldMapSetup enabled={WorldMapEnabled} icons={WorldMapIconCount} teleportCost={TeleportToNpcCost}";
+                Note(WorldMapEvidence);
                 break;
             case S.SearchMapResult smr:
-                Note($"SearchMapResult map={smr.MapIndex} npc={smr.NPCIndex}");
+                SearchMapOk = true;
+                SearchMapIndex = smr.MapIndex;
+                SearchNpcIndex = smr.NPCIndex;
+                if (smr.NPCIndex != 0)
+                {
+                    SelectedNpcId = smr.NPCIndex;
+                    var hit = _mapNpcs.FirstOrDefault(n => n.ObjectID == smr.NPCIndex);
+                    if (hit != null) SelectedNpcName = hit.Name;
+                }
+                SearchEvidence = $"S.SearchMapResult q={SearchQuery ?? "-"} map={smr.MapIndex} npc={smr.NPCIndex}";
+                Note(SearchEvidence);
                 break;
             case S.UserInformation user:
                 UserObjectId = user.ObjectID;
@@ -1266,6 +1423,13 @@ internal sealed class CrystalSession : IDisposable
                 if (_objects.TryGetValue(UserObjectId, out var self))
                     self.Location = loc.Location;
                 Note($"UserLocation {loc.Location.X},{loc.Location.Y} dir={loc.Direction}");
+                if (_pendingTeleport)
+                {
+                    TeleportOk = true;
+                    TeleportEvidence = $"TeleportToNPC UserLocation {loc.Location.X},{loc.Location.Y} gold={UserGold} id={SelectedNpcId}";
+                    Note(TeleportEvidence);
+                    _pendingTeleport = false;
+                }
                 break;
             case S.ObjectPlayer op:
                 Upsert(op.ObjectID, op.Name, op.Location, "player", "CArmour/00.Lib", 0);
@@ -1314,6 +1478,13 @@ internal sealed class CrystalSession : IDisposable
                 GoldSpent += lg.Gold;
                 UserGold = UserGold > lg.Gold ? UserGold - lg.Gold : 0;
                 Note($"LoseGold -{lg.Gold} gold={UserGold}");
+                if (_pendingTeleport)
+                {
+                    TeleportOk = true;
+                    TeleportEvidence = $"TeleportToNPC LoseGold -{lg.Gold} gold={_pendingTeleportGold}→{UserGold} id={SelectedNpcId} name={SelectedNpcName ?? "-"}";
+                    Note(TeleportEvidence);
+                    _pendingTeleport = false;
+                }
                 break;
             case S.SellItem sold:
                 Note($"SellItem Success={sold.Success} uid={sold.UniqueID} count={sold.Count}");

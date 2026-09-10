@@ -20,6 +20,7 @@ public static class SampleDataWriter
         WriteLib(Path.Combine(dataRoot, "MMap.Lib"), 4, 32);
         WriteLib(Path.Combine(dataRoot, "MagIcon.Lib"), 4, 16);
         WriteLib(Path.Combine(dataRoot, "MagIcon2.Lib"), 4, 16);
+        WriteLib(Path.Combine(dataRoot, "MapLinkIcon.Lib"), 4, 12);
         WriteLib(Path.Combine(dataRoot, "Map", "WemadeMir2", "Tiles.Lib"), 3, 48);
         WriteLib(Path.Combine(dataRoot, "Monster", "000.Lib"), 2, 32);
         WriteLib(Path.Combine(dataRoot, "CArmour", "00.Lib"), 1, 24);

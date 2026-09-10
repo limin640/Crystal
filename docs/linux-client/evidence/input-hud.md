@@ -321,6 +321,14 @@ FightHit=True LootOk=True EquipOk=True
 
 **Case-fold** `--data /tmp/crystal-mmap-case` (`mmap.Lib`): **EXIT:0** — `BigMapOk=True` draws=70 `src=/tmp/crystal-mmap-case/mmap.Lib`.
 
+## World overlay / SearchMap / TeleportToNPC (later)
+
+`MapLinkIcon.Lib` via `DataPath`. Quad chrome if Prguse2/Title missing. `WorldMap` / `SearchMap:text` / `TeleportNpc`.
+
+**Hard-gate** (closed / no `--data`): **EXIT:0** — `MapLinkIconOk=False` `WorldMapOk=False`.
+
+**Smoke** `--data` + tokens: **EXIT:0** — `MapLinkIconOk=True` when present; `SearchMapOk` from `S.SearchMapResult`.
+
 ## Version hash (later)
 
 Same MD5-of-file as WinForms. Server `--version-path` / Client `--version-file` (default `Crystal.Client.Linux.dll`). `--no-version-check` is opt-out. Do not vendor `Mir2.Exe`.
@@ -336,4 +344,4 @@ FightHit=True LootOk=True EquipOk=True
 
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon / MagIcon2 load only when the operator `--data` tree has those files. Big-map chrome uses MapReader size + those frames; world-map overlay (`Prguse2` / `MapLinkIcon`) stays leftover. Do not vendor Sound packs; fixture wav is not game art. Version hash uses an operator file or this host's Linux client DLL. See `MIGRATION.md` residuals checklist.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon / MagIcon2 / MapLinkIcon load only when the operator `--data` tree has those files. World overlay uses MapLinkIcon frames or quads — no invented Prguse2. Do not vendor Sound packs; fixture wav is not game art. Version hash uses an operator file or this host's Linux client DLL. See `MIGRATION.md` residuals checklist.

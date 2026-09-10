@@ -168,7 +168,7 @@ internal static class Program
         if (session != null)
         {
             Console.WriteLine($"  version : VersionCheckOk={session.VersionCheckOk} Result={session.VersionResult?.ToString() ?? "-"} src={session.VersionHashSource ?? "-"} md5={session.VersionHashHex ?? "-"}");
-            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} drags={session.InputDrags} quests={session.InputQuests} mags={session.InputMags} bigmaps={session.InputBigMaps} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} DragOk={session.DragOk} QuestAcceptOk={session.QuestAcceptOk} QuestFinishOk={session.QuestFinishOk} MagicOk={session.MagicOk} BigMapOk={session.BigMapOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
+            Console.WriteLine($"  input   : walks={session.InputWalks} attacks={session.InputAttacks} pickups={session.InputPickups} chats={session.InputChats} talks={session.InputTalks} buys={session.InputBuys} sells={session.InputSells} trades={session.InputTrades} drags={session.InputDrags} quests={session.InputQuests} mags={session.InputMags} bigmaps={session.InputBigMaps} worlds={session.InputWorldMaps} searches={session.InputSearches} teleports={session.InputTeleports} NpcTalkOk={session.NpcTalkOk} BuyOk={session.BuyOk} SellOk={session.SellOk} DragOk={session.DragOk} QuestAcceptOk={session.QuestAcceptOk} QuestFinishOk={session.QuestFinishOk} MagicOk={session.MagicOk} BigMapOk={session.BigMapOk} WorldMapOk={session.WorldMapOk} SearchMapOk={session.SearchMapOk} TeleportOk={session.TeleportOk} TradeHandshake={session.TradeHandshakeOk} TradeDone={session.TradeDone}");
             Console.WriteLine($"  items   : bag={session.BagCount} gold={session.UserGold} equip={session.EquippedFilled} magics={session.Magics.Count} chat={session.ChatLines.Count}");
             if (session.BuyEvidence != null)
                 Console.WriteLine($"  buy     : {session.BuyEvidence}");
@@ -190,6 +190,12 @@ internal static class Program
                 Console.WriteLine($"  mag     : {session.MagicEvidence}");
             if (session.BigMapEvidence != null)
                 Console.WriteLine($"  bigmap  : {session.BigMapEvidence}");
+            if (session.WorldMapEvidence != null)
+                Console.WriteLine($"  world   : {session.WorldMapEvidence}");
+            if (session.SearchEvidence != null)
+                Console.WriteLine($"  search  : {session.SearchEvidence}");
+            if (session.TeleportEvidence != null)
+                Console.WriteLine($"  teleport: {session.TeleportEvidence}");
         }
         Console.WriteLine("Hard-gate verbs stay evidenced; this host adds input-driven walk/attack + IRenderer inventory/equip HUD.");
         mapView?.Dispose();
