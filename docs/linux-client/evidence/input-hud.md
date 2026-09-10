@@ -223,7 +223,11 @@ Windows `SoundManager` calls through `IAudio` (`NAudioAudio`). WebView2 is Windo
 
 ## Windows SoundManager → IAudio (later)
 
-`SoundManager.Create()` → `AudioFactory.CreateNAudio()`. Linux PlayGate unchanged (`AudioFactory.Create`). Windows `Client.csproj` build command: `dotnet build Client\Client.csproj -c Release` (this VM: `NETSDK1100`). Evidence for Linux `--play-sound` / hard-gate is recorded after the agent run.
+`SoundManager.Create()` → `AudioFactory.CreateNAudio()`. Linux PlayGate unchanged (`AudioFactory.Create`). Windows `Client.csproj` build command: `dotnet build Client\Client.csproj -c Release` (this VM: `NETSDK1100`).
+
+**`--headless --play-sound`**: **EXIT:0** — `SoundPlayOk=True backend=Silk.NET OpenAL`
+
+**`--connect --headless`**: **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `sound: backend=Null (headless)`
 
 ## Catalog 86 / deferred
 

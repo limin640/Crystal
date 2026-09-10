@@ -480,7 +480,21 @@ dotnet build Client\Client.csproj -c Release
 
 This Linux VM: `NETSDK1100` (`net8.0-windows7.0` needs `EnableWindowsTargeting` + a Windows pack). `Crystal.Audio` (includes NAudio backend) and `Client.Linux` **do** build here.
 
-**Linux evidence** (same VM): `--play-sound` OpenAL + `--connect --headless` Null / PlayGate — see next evidence block after the run.
+**Linux** `--headless --play-sound`: **EXIT:0**
+
+```
+SoundPlayOk=True backend=Silk.NET OpenAL file=/workspace/Tools/Crystal.Audio/fixtures/tone.wav err=-
+```
+
+**Hard-gate** `--connect --headless` (no `--play-sound`): **EXIT:0**
+
+```
+FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=66116 by self
+  loot  : PickUp ground (HP)DrugSmall at 303,611 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=1
+sound: backend=Null (headless) SoundPlayOk=False skipped=headless
+```
 
 ## Remaining residuals (checklist)
 
