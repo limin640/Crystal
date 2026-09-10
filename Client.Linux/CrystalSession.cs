@@ -709,16 +709,10 @@ internal sealed class CrystalSession : IDisposable
     {
         foreach (var info in _questInfo.Values.OrderBy(q => q.Index))
         {
+            if (info.NPCIndex == 0) continue;
             if (_takenQuests.ContainsKey(info.Index) || _completedQuestIds.Contains(info.Index))
                 continue;
-            if (FindQuestNpc(info.NPCIndex, info.Index) != null)
-                return info.Index;
-        }
-
-        foreach (var info in _questInfo.Values.OrderBy(q => q.Index))
-        {
-            if (!_takenQuests.ContainsKey(info.Index) && !_completedQuestIds.Contains(info.Index))
-                return info.Index;
+            return info.Index;
         }
 
         return -1;
@@ -744,28 +738,35 @@ internal sealed class CrystalSession : IDisposable
         return "?";
     }
 
-    WorldObject? FindQuestNpc(uint objectId, int questIndex)
+    WorldObject? FindNpcByObjectId(uint objectId)
     {
         if (objectId != 0 && _objects.TryGetValue(objectId, out var byId) && byId.Kind == "npc")
             return byId;
-        return _objects.Values.FirstOrDefault(o =>
-            o.Kind == "npc" && o.QuestIDs.Contains(questIndex));
+        return null;
     }
 
     void EnsureNearQuestNpc(uint objectId, int questIndex, string why)
     {
-        var npc = FindQuestNpc(objectId, questIndex);
+        var npc = FindNpcByObjectId(objectId);
         if (npc == null)
         {
             Note($"quest-{why}: NPC id={objectId} not in view; @MOVE 289 617 (Talk BorderVillage)");
             Chat("@MOVE 289 617");
-            Pump(900);
-            npc = FindQuestNpc(objectId, questIndex);
+            Pump(1000);
+            npc = FindNpcByObjectId(objectId);
         }
 
         if (npc == null)
         {
-            Note($"quest-{why}: still no ObjectNPC for quest {questIndex}");
+            Note($"quest-{why}: still no ObjectNPC id={objectId}; step west (Assistant Jane strip)");
+            Chat($"@MOVE {Math.Max(0, UserLocation.X - 12)} {UserLocation.Y - 8}");
+            Pump(1000);
+            npc = FindNpcByObjectId(objectId);
+        }
+
+        if (npc == null)
+        {
+            Note($"quest-{why}: ObjectNPC id={objectId} still missing for quest {questIndex}");
             return;
         }
 
@@ -780,7 +781,7 @@ internal sealed class CrystalSession : IDisposable
         if (!Functions.InRange(UserLocation, npc.Location, Globals.DataRange))
         {
             Chat($"@MOVE {npc.Location.X} {npc.Location.Y}");
-            Pump(700);
+            Pump(800);
         }
     }
 
