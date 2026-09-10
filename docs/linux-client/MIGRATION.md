@@ -190,7 +190,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | `SelectScene` / `GameScene` dialog graph | Stub — HUD + packets only |
 | Inventory bag + equip slots | **In progress** — IRenderer panel from `UserInformation` / `GainedItem` / `EquipItem` |
 | Belt (inv 0–5) | **In progress** — IRenderer stub, Crystal `BeltDialog` slot map |
-| Skill bar | **In progress** — 8 stubs from `ClientMagic`; `MagIcon.Lib` tiles via `--data` when present (`Icon * 2`, same as WinForms). No targeting |
+| Skill bar | **In progress** — 8 stubs from `ClientMagic`; `MagIcon.Lib` tiles via `--data` when present (`Icon * 2`, same as WinForms). BOOK stub uses `MagIcon2`. `--input-script Mag` / `MagTarget` → `C.Magic` |
 | Chat log + send | **In progress** — last 4 lines; `--input-script Chat:hello` / windowed Enter compose → `C.Chat` |
 | Mini-map chrome | **In progress** — IRenderer geometry + player blip; `MMap.Lib` tile via `--data` / catalog when present (`MapInformation.MiniMap` index, first decoded frame if that index is missing) |
 | NPC talk (`C.CallNPC` `[@Main]` / `S.NPCResponse`) | **In progress** — IRenderer name + dialog lines |
@@ -529,7 +529,7 @@ hud quest: info=154 taken=0 done=1 accepts=0 AcceptOk=False FinishOk=False
 
 WinForms `Libraries.MiniMap` / `Libraries.MagIcon` are `Settings.DataPath + "MMap"` / `"MagIcon"` (`.Lib`). Client.Linux uses the same files through `Crystal.Assets` `LibraryParser` / `MLibParser` + `IRenderer` when `--data` / `CRYSTAL_DATA` points at an external Data tree (or a bake catalog sprite exists). Missing files skip — no invented texels. Do not vendor the pack. On Linux, `DataPath` tries the exact name then a case-fold match in the directory so an operator `mmap.Lib` opens as `MMap.Lib` (no symlink). The same resolver is used for other Data `.Lib` paths in `MapView`.
 
-Bake fixture `Tools/Crystal.Bake/fixtures/bake-out` has no MMap/MagIcon sprites (they stay in the listed **86** missing catalog slots). Operator path: download the mirfiles Crystal `Data` folder (the directory that contains `MMap.Lib` and `MagIcon.Lib`) and pass `--data /path/to/Data`. Smoke without a pack: `crystal-bake init-sample /tmp/crystal-mmap-sample` writes synthetic checkers (not game art) including those two files.
+Bake fixture `Tools/Crystal.Bake/fixtures/bake-out` has no MMap/MagIcon/MagIcon2 sprites (they stay in the listed **86** missing catalog slots). Operator path: download the mirfiles Crystal `Data` folder (the directory that contains `MMap.Lib`, `MagIcon.Lib`, and `MagIcon2.Lib`) and pass `--data /path/to/Data`. Smoke without a pack: `crystal-bake init-sample /tmp/crystal-mmap-sample` writes synthetic checkers (not game art) including those files.
 
 **Hard-gate** `--connect --headless` (no `--data`): **EXIT:0**
 
@@ -568,11 +568,47 @@ hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1 mmapSrc=/tmp/crystal
 
 ### MagIcon2 skill-book / C.Magic (2026-09-10, same VM)
 
-WinForms `MagicButton` / `AssignKeyPanel` use `Libraries.MagIcon2` at `magic.Icon * 2`. Client.Linux binds `MagIcon2.Lib` independently (case-insensitive `DataPath`) and draws a BOOK stub. `--input-script Mag` / `MagTarget[:id|:Spell]` send Shared `C.Magic` (`SpellTargetLock` on MagTarget). `S.Magic` / `S.MagicCast` are logged when the character knows the spell (starter Warrior often has none).
+WinForms `MagicButton` / `AssignKeyPanel` use `Libraries.MagIcon2` at `magic.Icon * 2`. Client.Linux binds `MagIcon2.Lib` independently (case-insensitive `DataPath`) and draws a BOOK stub. `--input-script Mag` / `MagTarget[:id|:Spell]` send Shared `C.Magic` (`SpellTargetLock` on MagTarget). `S.Magic` / `S.MagicCast` are logged when the character knows the spell (starter Warrior often has none). `crystal-bake init-sample` writes a synthetic `MagIcon2.Lib` (not game art). Do not vendor the pack.
 
-**Hard-gate** (no `--data`): **EXIT:0** — `MagIcon2Ok=False` mag2Draws=0.
+**Hard-gate** `--connect --headless` (no `--data`, no `--input-script`): **EXIT:0**
 
-**Smoke** `init-sample` `--data` (includes `MagIcon2.Lib`): **EXIT:0** — `MagIcon2Ok=True` mag2Draws≥1.
+```
+hud-lib skip MagIcon2.Lib: missing (no --data / catalog sprite)
+hud-lib ready MMapOk=False MagIconOk=False MagIcon2Ok=False images=0/0/0
+VersionCheckOk=True VersionResult=1 src=…/Crystal.Client.Linux.dll md5=ae85de9bcee2a55b8bc5f5ad47a7b649
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58297 by self
+  loot  : PickUp ground (HP)DrugSmall at 289,610 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=1
+hud mmap: MMapOk=False MagIconOk=False MagIcon2Ok=False mmapDraws=0 magDraws=0 mag2Draws=0 mag2Index=-1 mag2Src=- images=0/0/0
+  input   : mags=0 MagicOk=False
+```
+
+**Smoke** `--connect --headless --data /tmp/crystal-mmap-sample --input-script Mag,MagTarget` (`crystal-bake init-sample`, not a vendored pack): **EXIT:0**
+
+```
+hud-lib MagIcon2 file=MagIcon2.Lib ok=True images=4 src=/tmp/crystal-mmap-sample/MagIcon2.Lib
+hud-lib ready MMapOk=True MagIconOk=True MagIcon2Ok=True images=4/4/4
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58655 by self
+  loot  : PickUp ground (HP)DrugSmall at 289,610 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=5
+input Mag C.Magic spell=Fencing target=3302 lock=False loc=291,597 known=0 #1
+input Mag C.Magic spell=Fencing target=3302 lock=True loc=291,597 known=0 #2
+input-script done mags=2 MagicOk=False
+hud mmap: MMapOk=True MagIconOk=True MagIcon2Ok=True mmapDraws=1 magDraws=1 mag2Draws=1 mag2Index=0 mag2Src=/tmp/crystal-mmap-sample/MagIcon2.Lib images=4/4/4
+  mag     : C.Magic spell=Fencing target=3302 lock=True loc=291,597 known=0
+```
+
+Warrior has no `ClientMagic` (`known=0`); Mag still sends `C.Magic` `Fencing` and BOOK slot 0 probes `MagIcon2[0]` (`mag2Draws=1`). `S.Magic` did not arrive (`MagicOk=False`) — expected for an unlearned spell.
+
+**Case-fold** `--data /tmp/crystal-mmap-case` with only `mmap.Lib` + `magicon.Lib` + `magicon2.Lib` (no `MagIcon2.Lib` symlink): **EXIT:0**
+
+```
+hud-lib MagIcon2 file=MagIcon2.Lib ok=True images=4 src=/tmp/crystal-mmap-case/magicon2.Lib
+hud-lib ready MMapOk=True MagIconOk=True MagIcon2Ok=True images=4/4/4
+hud mmap: MagIcon2Ok=True mag2Draws=1 mag2Src=/tmp/crystal-mmap-case/magicon2.Lib
+```
 
 ### Version hash (2026-09-10, same VM)
 

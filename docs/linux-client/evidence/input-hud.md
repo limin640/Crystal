@@ -276,11 +276,28 @@ hud mmap: MMapOk=True MagIconOk=True mmapDraws=1 magDraws=1
 
 ## MagIcon2 skill-book / C.Magic (later)
 
-Independent `MagIcon2.Lib` bind (WinForms skill-book). `--input-script Mag` / `MagTarget` → `C.Magic`.
+Independent `MagIcon2.Lib` bind (WinForms skill-book `MagicButton` / `AssignKeyPanel`, `Icon * 2`). `--input-script Mag` / `MagTarget` → Shared `C.Magic` (`SpellTargetLock` on MagTarget). Starter Warrior often has no learned spell; `MagicOk` stays false. Linux `DataPath` opens `magicon2.Lib` as `MagIcon2.Lib`.
 
-**Hard-gate** (no `--data`): **EXIT:0** — `MagIcon2Ok=False`.
+**Hard-gate** `--connect --headless` (no `--data`): **EXIT:0**
 
-**Smoke** `--data` with `MagIcon2.Lib`: **EXIT:0** — `MagIcon2Ok=True` mag2Draws≥1.
+```
+hud-lib skip MagIcon2.Lib: missing (no --data / catalog sprite)
+hud-lib ready MMapOk=False MagIconOk=False MagIcon2Ok=False images=0/0/0
+FightHit=True LootOk=True EquipOk=True
+hud mmap: MagIcon2Ok=False mag2Draws=0 mag2Index=-1
+```
+
+**Smoke** `--data /tmp/crystal-mmap-sample --input-script Mag,MagTarget` (`crystal-bake init-sample`): **EXIT:0**
+
+```
+hud-lib MagIcon2 file=MagIcon2.Lib ok=True images=4 src=/tmp/crystal-mmap-sample/MagIcon2.Lib
+hud-lib ready MagIcon2Ok=True images=4/4/4
+FightHit=True LootOk=True EquipOk=True
+input Mag C.Magic spell=Fencing target=3302 lock=True known=0
+hud mmap: MagIcon2Ok=True mag2Draws=1 mag2Index=0 mag2Src=/tmp/crystal-mmap-sample/MagIcon2.Lib
+```
+
+**Case-fold** `--data /tmp/crystal-mmap-case` (`magicon2.Lib` only): **EXIT:0** — `src=/tmp/crystal-mmap-case/magicon2.Lib` mag2Draws=1.
 
 ## Version hash (later)
 
