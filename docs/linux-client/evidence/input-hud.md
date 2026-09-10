@@ -325,9 +325,26 @@ FightHit=True LootOk=True EquipOk=True
 
 `MapLinkIcon.Lib` via `DataPath`. Quad chrome if Prguse2/Title missing. `WorldMap` / `SearchMap:text` / `TeleportNpc`.
 
-**Hard-gate** (closed / no `--data`): **EXIT:0** — `MapLinkIconOk=False` `WorldMapOk=False`.
+**Hard-gate** `--connect --headless` (closed / no `--data`): **EXIT:0**
 
-**Smoke** `--data` + tokens: **EXIT:0** — `MapLinkIconOk=True` when present; `SearchMapOk` from `S.SearchMapResult`.
+```
+hud-lib skip MapLinkIcon.Lib: missing (no --data / catalog sprite)
+hud world: open=False WorldMapOk=False MapLinkIconOk=False
+FightHit=True LootOk=True EquipOk=True
+```
+
+**Smoke** `--data /tmp/crystal-mmap-sample --input-script WorldMap,SearchMap:Bic,TeleportNpc`: **EXIT:0**
+
+```
+hud-lib MapLinkIcon file=MapLinkIcon.Lib ok=True src=/tmp/crystal-mmap-sample/MapLinkIcon.Lib
+S.SearchMapResult q=Bic map=1 npc=0
+hud world: WorldMapOk=True draws=64 MapLinkIconOk=True
+hud search: SearchMapOk=True q=Bic map=1
+hud teleport: TeleportOk=False can=0 (Bichon NPCs not CanTeleportTo)
+FightHit=True LootOk=True EquipOk=True
+```
+
+**Case-fold** `maplinkicon.Lib`: **EXIT:0** — `src=/tmp/crystal-mmap-case/maplinkicon.Lib`.
 
 ## Version hash (later)
 

@@ -652,9 +652,39 @@ WinForms world overlay draws Prguse2 frames 1360/1365/1366 plus `Libraries.MapLi
 
 Client.Linux binds `MapLinkIcon.Lib` via case-insensitive `DataPath` (skip when absent). World overlay is quad chrome — **no invented Prguse2 / Title frames**. `--input-script WorldMap` / `SearchMap:text` / `TeleportNpc` / `Teleport:id`. Jev `Configs/WorldMap.ini` is `Enabled=False` with no layout icons; the packet still arrives.
 
-**Hard-gate** (no `--data`, overlay closed): **EXIT:0** — `MapLinkIconOk=False` `WorldMapOk=False` `SearchMapOk=False` `TeleportOk=False`.
+**Hard-gate** `--connect --headless` (no `--data`, overlay closed): **EXIT:0**
 
-**Smoke** `--data` + `WorldMap,SearchMap:Bic,TeleportNpc`: **EXIT:0** — `MapLinkIconOk=True` when the file is present; `SearchMapOk` from `S.SearchMapResult`; `TeleportOk` only if a `CanTeleportTo` NPC exists (else skip, still EXIT:0).
+```
+hud-lib skip MapLinkIcon.Lib: missing (no --data / catalog sprite)
+hud-lib ready MapLinkIconOk=False images=0/0/0/0
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58296 by self
+  loot  : PickUp ground (HP)DrugSmall at 289,610 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=1
+hud world: open=False WorldMapOk=False MapLinkIconOk=False icons=0 draws=0
+hud search: SearchMapOk=False searches=0
+hud teleport: TeleportOk=False teleports=0 can=0
+```
+
+**Smoke** `--data /tmp/crystal-mmap-sample --input-script WorldMap,SearchMap:Bic,TeleportNpc` (`crystal-bake init-sample`): **EXIT:0**
+
+```
+WorldMapSetup enabled=False icons=0 teleportCost=3000
+NewMapInfo index=1 title=BichonProvince npcs=39 canTeleport=0 moves=5
+input WorldMap open=True enabled=False icons=0 cost=3000
+C.SearchMap q=Bic
+S.SearchMapResult q=Bic map=1 npc=0
+input TeleportNpc skip no CanTeleportTo npcs=39 cost=3000
+hud-lib MapLinkIcon file=MapLinkIcon.Lib ok=True images=4 src=/tmp/crystal-mmap-sample/MapLinkIcon.Lib
+hud world: open=True WorldMapOk=True MapLinkIconOk=True icons=0 drawn=0 draws=64 src=/tmp/crystal-mmap-sample/MapLinkIcon.Lib
+hud search: SearchMapOk=True q=Bic map=1 npc=0
+hud teleport: TeleportOk=False can=0 teleports=1
+FightHit=True LootOk=True EquipOk=True
+```
+
+Jev `WorldMap.ini` has no icons, so overlay chrome is quads (`draws=64`) — no invented Prguse2. Bichon NPCs have `CanTeleportTo=False`; `C.TeleportToNPC` is not sent unless an id is eligible. `SearchMap:Bic` matches `BichonProvince` (`BigMap>0`).
+
+**Case-fold** `--data /tmp/crystal-mmap-case` (`maplinkicon.Lib`): **EXIT:0** — `MapLinkIconOk=True` `src=/tmp/crystal-mmap-case/maplinkicon.Lib` `WorldMapOk=True`.
 
 ### Version hash (2026-09-10, same VM)
 
