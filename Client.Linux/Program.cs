@@ -121,7 +121,8 @@ internal static class Program
         MapView? mapView = null;
         if (catalog != null)
             mapView = new MapView(renderer, catalog.Textures, catalog.Sprites, dataRoot);
-        using var hud = new SceneHud(renderer);
+        using var libs = new HudLibSheet(renderer, dataRoot, catalog?.Textures, catalog?.Sprites);
+        using var hud = new SceneHud(renderer, libs);
 
         bool drewMap = TryLoadAndDrawMap(mapView, mapsRoot, session, renderer, width, height, frames, catalog, hud);
 
@@ -260,6 +261,7 @@ internal static class Program
             CatalogGpu? catalog = null;
             MapView? mapView = null;
             SceneHud? hud = null;
+            HudLibSheet? libs = null;
             IInputContext? input = null;
             int frameCount = 0;
             DateTime nextHeld = DateTime.UtcNow;
@@ -269,9 +271,10 @@ internal static class Program
             {
                 gl = window.CreateOpenGL();
                 renderer = RendererFactory.CreateOpenGL(gl, window.Size.X, window.Size.Y);
-                hud = new SceneHud(renderer);
                 if (catalogPath != null && File.Exists(catalogPath))
                     catalog = LoadCatalogInto(renderer, catalogPath);
+                libs = new HudLibSheet(renderer, dataRoot, catalog?.Textures, catalog?.Sprites);
+                hud = new SceneHud(renderer, libs);
                 if (catalog != null)
                     mapView = new MapView(renderer, catalog.Textures, catalog.Sprites, dataRoot);
                 if (mapView != null && session is { InMap: true } && !string.IsNullOrWhiteSpace(session.MapFileName) && !string.IsNullOrWhiteSpace(mapsRoot))
@@ -411,6 +414,7 @@ internal static class Program
             {
                 input?.Dispose();
                 hud?.Dispose();
+                libs?.Dispose();
                 mapView?.Dispose();
                 catalog?.Dispose();
                 renderer?.Dispose();

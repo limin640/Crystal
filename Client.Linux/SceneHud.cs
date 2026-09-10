@@ -12,6 +12,7 @@ internal sealed class SceneHud : IDisposable
     readonly IRenderer _renderer;
     readonly IGpuTexture _white;
     readonly IGpuTexture _font;
+    readonly HudLibSheet? _libs;
     const int GlyphW = 4;
     const int GlyphH = 6;
     const int Scale = 2;
@@ -41,9 +42,10 @@ internal sealed class SceneHud : IDisposable
     const int BeltInsetX = 140;
     const int BeltInsetY = 118;
 
-    public SceneHud(IRenderer renderer)
+    public SceneHud(IRenderer renderer, HudLibSheet? libs = null)
     {
         _renderer = renderer;
+        _libs = libs;
         _white = renderer.CreateSolidTexture(2, 2, Color.White);
         _font = BuildFont(renderer);
     }
@@ -103,7 +105,8 @@ internal sealed class SceneHud : IDisposable
     public void WriteEvidence(CrystalSession session)
     {
         Console.WriteLine($"hud inventory/equip: bag={BagFilled}/{session.InventorySlots.Count} gold={session.UserGold} equip={EquipFilled}/{session.EquipmentSlots.Count} belt={BeltFilled}/{CrystalSession.BeltSlotCount} skills={SkillsFilled} chat={session.ChatLines.Count}");
-        Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex} (geometry only)");
+        Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex}");
+        Console.WriteLine($"hud mmap: MMapOk={_libs?.MMapOk ?? false} MagIconOk={_libs?.MagIconOk ?? false} mmapDraws={_libs?.MMapTileDraws ?? 0} magDraws={_libs?.MagIconTileDraws ?? 0} mmapIndex={_libs?.MMapDrawIndex ?? -1} magIndex={_libs?.MagIconDrawIndex ?? -1} mmapSrc={_libs?.MMapSource ?? "-"} magSrc={_libs?.MagIconSource ?? "-"} images={_libs?.MMapImages ?? 0}/{_libs?.MagIconImages ?? 0}");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
         Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count} gold={session.UserGold} bag={session.BagCount} buys={session.InputBuys} sells={session.InputSells} BuyOk={session.BuyOk} SellOk={session.SellOk}");
         Console.WriteLine($"hud quest: info={session.QuestCatalog.Count} taken={session.TakenQuests.Count} done={session.CompletedQuestIds.Count} accepts={session.InputQuests} AcceptOk={session.QuestAcceptOk} FinishOk={session.QuestFinishOk}");
@@ -282,11 +285,15 @@ internal sealed class SceneHud : IDisposable
         Fill(x + 2, y + 14, size - 4, size - 16, Color.FromArgb(255, 12, 20, 14));
         Text(x + 4, y + 2, "MAP", Color.PaleGreen);
 
+        int inner = size - 20;
+        int ox = x + 4;
+        int oy = y + 16;
+        bool mmapTile = _libs != null && _libs.TryDrawMMap(session.MiniMapIndex, ox, oy, inner, inner);
+        if (mmapTile)
+            Text(x + 36, y + 2, "MMAP", Color.Khaki);
+
         if (mw > 0 && mh > 0)
         {
-            int inner = size - 20;
-            int ox = x + 4;
-            int oy = y + 16;
             var cells = mapView is { MapLoaded: true } ? mapView.Cells : null;
             const int samples = 32;
             float cw = inner / (float)samples;
@@ -303,7 +310,7 @@ internal sealed class SceneHud : IDisposable
                         var cell = cells[mx, my];
                         filled = cell.BackImage != 0 && cell.BackIndex != -1;
                     }
-                    if (filled)
+                    if (filled && !mmapTile)
                         Fill(ox + (int)(sx * cw), oy + (int)(sy * ch), Math.Max(1, (int)cw), Math.Max(1, (int)ch), Color.FromArgb(180, 28, 48, 32));
                 }
             }
@@ -421,6 +428,9 @@ internal sealed class SceneHud : IDisposable
             ClientMagic? mag = i < session.Magics.Count ? session.Magics[i] : null;
             int cx = x + 6 + i * 36;
             Fill(cx, y + 16, 32, 16, mag == null ? Color.FromArgb(150, 28, 28, 40) : Color.FromArgb(210, 64, 48, 96));
+            int icon = mag != null ? mag.Icon * 2 : (i == 0 ? 0 : -1);
+            if (icon >= 0)
+                _libs?.TryDrawMagIcon(icon, cx + 16, y + 16, 16, 16);
             string label = mag == null ? $"F{i + 1}" : Clip(string.IsNullOrWhiteSpace(mag.Name) ? mag.Spell.ToString() : mag.Name, 4);
             Text(cx + 1, y + 17, label, mag == null ? Color.Gray : Color.White);
             if (mag != null) SkillsFilled++;

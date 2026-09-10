@@ -1083,7 +1083,7 @@ internal sealed class CrystalSession : IDisposable
                 MapTitle = map.Title;
                 MiniMapIndex = map.MiniMap;
                 InMap = true;
-                Note($"in-map: MapInformation index={map.MapIndex} file={map.FileName} title={map.Title} lights={map.Lights} minimapLib={map.MiniMap} (MMap.Lib deferred — geometry chrome only)");
+                Note($"in-map: MapInformation index={map.MapIndex} file={map.FileName} title={map.Title} lights={map.Lights} minimapLib={map.MiniMap} (MMap.Lib via --data / catalog when present)");
                 break;
             case S.UserInformation user:
                 UserObjectId = user.ObjectID;

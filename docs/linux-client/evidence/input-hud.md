@@ -82,7 +82,7 @@ Skill bar draws 8 empty stubs when `Magics` is empty (Warrior, no invented spell
 
 ## Mini-map geometry + Shared chat send (same VM, later)
 
-No invented `MMap.Lib` art. Occupancy + blip from `MapReader` size / `MapCell` / packet objects.
+Occupancy + blip from `MapReader` size / `MapCell` / packet objects. `MMap.Lib` tiles draw only when `--data` has the file (see later MMap section). No invented map art.
 
 **Input-script** `--no-gate --input-script Right,Chat:hello,Attack,Down,Attack`: **EXIT:0**
 
@@ -241,6 +241,16 @@ QuestAcceptOk=True QuestFinishOk=True
 
 **Hard-gate** `--connect --headless`: **EXIT:0** — `quests=0` `QuestAcceptOk=False`.
 
+## MMap.Lib / MagIcon tiles (later)
+
+Optional `--data` / `CRYSTAL_DATA`. Same files as WinForms `Libraries.MiniMap` / `MagIcon`. Parse via `MLibParser`; draw via `IRenderer`. Skip when absent.
+
+**Hard-gate** `--connect --headless` (no `--data`): **EXIT:0** — `MMapOk=False MagIconOk=False` mmapDraws=0 magDraws=0.
+
+**Smoke** `--data` from `crystal-bake init-sample` (synthetic checkers, not game art): **EXIT:0** — `MMapOk=True MagIconOk=True` plus draw counts.
+
+Operator pack: `--data /path/to/Crystal/Data` (do not vendor). Bake fixture catalog still lists MMap/MagIcon among the **86** missing slots.
+
 ## Catalog 86 / deferred
 
-86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons / `MMap.Lib` / MagIcon stay pack-missing. Do not vendor Sound packs; fixture wav is not game art. See `MIGRATION.md` residuals checklist.
+86 catalog slots remain pack-missing (listed, not synthesized). WebView2 (WinForms Evergreen — no Linux runtime) stays permanently deferred. WIL item icons stay pack-missing. `MMap.Lib` / MagIcon load only when the operator `--data` tree has those files. Do not vendor Sound packs; fixture wav is not game art. See `MIGRATION.md` residuals checklist.

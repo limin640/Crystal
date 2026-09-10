@@ -143,7 +143,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--connect` | Shared `Packet` session (Connected → version → account → select → StartGame) |
 | `--login-only` | Stop after `LoginSuccess` (no NewCharacter / StartGame) |
 | `--maps <dir>` | External Jev `Maps/` for `.map` load (`CRYSTAL_MAPS`). Not vendored. |
-| `--data <dir>` | Optional client Data tree for runtime `.Lib` via `MLibParser` (`CRYSTAL_DATA`) |
+| `--data <dir>` | Optional client Data tree (`CRYSTAL_DATA`). `MapView` floor `.Lib` plus `MMap.Lib` / `MagIcon.Lib` HUD tiles via `MLibParser`. Missing files skip. Do not vendor the pack. Operator: the folder that contains `MMap.Lib` (same as WinForms `Settings.DataPath`). Smoke: `crystal-bake init-sample /tmp/crystal-mmap-sample` |
 | `--catalog` | Bake atlas catalog (fixture or operator bake-out) |
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |

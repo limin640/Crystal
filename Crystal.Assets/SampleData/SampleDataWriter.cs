@@ -15,6 +15,10 @@ public static class SampleDataWriter
 
         WriteLib(Path.Combine(dataRoot, "Prguse.Lib"), 4, 8);
         WriteLib(Path.Combine(dataRoot, "Title.Lib"), 2, 16);
+        // WinForms Libraries.MiniMap / MagIcon live at DataPath + "MMap" / "MagIcon" (.Lib).
+        // Synthetic checkers — not game art. Generate under /tmp via init-sample; do not vendor.
+        WriteLib(Path.Combine(dataRoot, "MMap.Lib"), 4, 32);
+        WriteLib(Path.Combine(dataRoot, "MagIcon.Lib"), 4, 16);
         WriteLib(Path.Combine(dataRoot, "Map", "WemadeMir2", "Tiles.Lib"), 3, 48);
         WriteLib(Path.Combine(dataRoot, "Monster", "000.Lib"), 2, 32);
         WriteLib(Path.Combine(dataRoot, "CArmour", "00.Lib"), 1, 24);

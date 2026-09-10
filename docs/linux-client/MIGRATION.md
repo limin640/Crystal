@@ -190,9 +190,9 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | `SelectScene` / `GameScene` dialog graph | Stub — HUD + packets only |
 | Inventory bag + equip slots | **In progress** — IRenderer panel from `UserInformation` / `GainedItem` / `EquipItem` |
 | Belt (inv 0–5) | **In progress** — IRenderer stub, Crystal `BeltDialog` slot map |
-| Skill bar | **In progress** — 8 stubs from `ClientMagic` (no MagIcon WIL, no targeting) |
+| Skill bar | **In progress** — 8 stubs from `ClientMagic`; `MagIcon.Lib` tiles via `--data` when present (`Icon * 2`, same as WinForms). No targeting |
 | Chat log + send | **In progress** — last 4 lines; `--input-script Chat:hello` / windowed Enter compose → `C.Chat` |
-| Mini-map chrome | **In progress** — IRenderer geometry + player blip from map size / `MapCell` occupancy (`MMap.Lib` not loaded) |
+| Mini-map chrome | **In progress** — IRenderer geometry + player blip; `MMap.Lib` tile via `--data` / catalog when present (`MapInformation.MiniMap` index, first decoded frame if that index is missing) |
 | NPC talk (`C.CallNPC` `[@Main]` / `S.NPCResponse`) | **In progress** — IRenderer name + dialog lines |
 | NPC goods (`S.NPCGoods`) | **In progress** — list after `[@BUY]`/`[@BUYSELL]` |
 | NPC buy / sell (`C.BuyItem` / `C.SellItem`) | **In progress** — `--input-script Talk,Buy:0,Sell` uses existing `NPCGoods` UniqueIDs; gold/bag in logs + HUD |
@@ -200,8 +200,8 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | Player trade | **In progress** — two Client.Linux processes (`docs/linux-client/trade-two-process.sh`). `C.ChangeTrade` / `C.TradeRequest` / `C.TradeReply` / `C.TradeGold` / `C.DepositTradeItem` / `C.TradeConfirm` + matching `S.*`. Players must face each other. |
 | Inventory bag move (`C.MoveItem` / `C.MergeItem`) | **In progress** — `--input-script Drag:0,8` / `Merge:from,to`; HUD slot refresh. Same packets as `MirItemCell` |
 | Mouse-drag chrome (SelectedCell ghost / click-to-drop) | **In progress** — IRenderer colored-quad ghost + source/dest highlight on `Drag`. Windowed left-click pick/drop on bag/belt if Silk.NET mouse coords exist. Headless keeps `Drag:from,to` tokens. **No WIL item icons** |
-| Magic targeting / skill icons (`MagIcon`) | Stub |
-| Mini-map WIL (`MMap.Lib`) / big map | Stub — no invented map art |
+| Magic targeting / skill icons (`MagIcon`) | **In progress** — `MagIcon.Lib` (fallback `MagIcon2.Lib`) through `MLibParser` + `IRenderer` when `--data` has the file. Targeting / MagIcon2 skill-book still stub |
+| Mini-map WIL (`MMap.Lib`) / big map | **In progress** — `MMap.Lib` when `--data` has the file; skip when absent (no invented map art). Big-map dialog still stub |
 | CMain keybind INI | Stub |
 | MapControl lights / weather / doors | Stub (`MapView` floor/objects only) |
 | **Audio** | **In progress** — `Crystal.Audio` `IAudio`: Null (headless), Silk.NET OpenAL on Linux, **NAudio backend** on Windows. `SoundManager` is the GameScene index API and calls through `IAudio` (`AudioFactory.CreateNAudio()`). `--play-sound` / `--sound` / `CRYSTAL_SOUND`. Fixture `Tools/Crystal.Audio/fixtures/tone.wav` (not game art). Do not vendor the Sound pack |
@@ -360,7 +360,7 @@ hud draws: … minimap=817 total=1246
 
 **Hard-gate** (no `--input-script`): **EXIT:0** — `FightHit` `LootOk` `EquipOk`, `chats=0 ChatSent=0`, minimap still `700x700 draws=819`.
 
-`MMap.Lib` not loaded (`mmapLib=101` catalog index only). Quest accept/turn-in and WebView2 stay deferred. SelectedCell ghost is colored quads (no WIL icons).
+`MMap.Lib` was not on `--data` in that run (`mmapLib=101` catalog index only). Later increment loads it when the operator Data tree has the file. Quest accept/turn-in is evidenced. WebView2 stays deferred. SelectedCell ghost is colored quads (no WIL icons).
 
 ### Inventory / equip HUD (2026-09-09, same VM)
 
@@ -518,9 +518,22 @@ Starter Jev quest 1 has no kill/item tasks, so it completes on accept and turn-i
 
 ```
 FightHit=True LootOk=True EquipOk=True
+  fight : ObjectStruck id=68606 by self
+  loot  : PickUp ground (HP)DrugSmall at 288,615 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=5
 hud quest: info=154 taken=0 done=1 accepts=0 AcceptOk=False FinishOk=False
   input   : quests=0 QuestAcceptOk=False QuestFinishOk=False
 ```
+
+### MMap.Lib / MagIcon tiles (2026-09-10, same VM)
+
+WinForms `Libraries.MiniMap` / `Libraries.MagIcon` are `Settings.DataPath + "MMap"` / `"MagIcon"` (`.Lib`). Client.Linux uses the same files through `Crystal.Assets` `LibraryParser` / `MLibParser` + `IRenderer` when `--data` / `CRYSTAL_DATA` points at an external Data tree (or a bake catalog sprite exists). Missing files skip — no invented texels. Do not vendor the pack.
+
+Bake fixture `Tools/Crystal.Bake/fixtures/bake-out` has no MMap/MagIcon sprites (they stay in the listed **86** missing catalog slots). Operator path: download the mirfiles Crystal `Data` folder (the directory that contains `MMap.Lib` and `MagIcon.Lib`) and pass `--data /path/to/Data`. Smoke without a pack: `crystal-bake init-sample /tmp/crystal-mmap-sample` writes synthetic checkers (not game art) including those two files.
+
+**Hard-gate** `--connect --headless` (no `--data`): **EXIT:0** — `MMapOk=False MagIconOk=False` mmapDraws=0 magDraws=0 (skip).
+
+**Smoke** `--connect --headless --no-gate --data /tmp/crystal-mmap-sample`: **EXIT:0** — `MMapOk=True MagIconOk=True` plus draw counts. Jev `mmapLib=101` is past the 4-image fixture, so draw falls back to the first decoded frame.
 
 ## Remaining residuals (checklist)
 
@@ -529,7 +542,7 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **Full WinForms `GameScene`** — Client.Linux is Shared packets + `MapView` + IRenderer HUD, not a language rewrite of the scene graph / dialogs.
 - [ ] **WebView2** — Windows-only (WinForms Evergreen; no Linux runtime). Permanently deferred on Linux. `Client.Linux` must never reference it.
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
-- [ ] **`MMap.Lib` / MagIcon tiles** — mini-map stays geometry; skill bar stays 8 stubs. No invented map or spell art.
+- [x] **`MMap.Lib` / MagIcon tiles** — `HudLibSheet` parses optional `--data` `.Lib` via `MLibParser` and draws through `IRenderer`. Skip when absent (`MMapOk=False`). Leftover: no big-map dialog, no MagIcon2 skill-book / targeting, no invented tiles. Operator Data stays outside git.
 - [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [ ] **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
