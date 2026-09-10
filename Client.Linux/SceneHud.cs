@@ -106,6 +106,7 @@ internal sealed class SceneHud : IDisposable
         Console.WriteLine($"hud minimap: {session.MapWidth}x{session.MapHeight} blip={session.UserLocation.X},{session.UserLocation.Y} blips={MiniMapBlips} draws={MiniMapDraws} mmapLib={session.MiniMapIndex} (geometry only)");
         Console.WriteLine($"hud chat: sent={session.ChatSent} recv={session.ChatRecv} echo={session.ChatEcho} lines={session.ChatLines.Count}");
         Console.WriteLine($"hud npc: talkOk={session.NpcTalkOk} name={session.NpcName ?? "-"} id={session.NpcObjectId} calls={session.NpcCallSent} lines={session.NpcDialogLines.Count} goods={session.NpcGoods.Count} quests={session.QuestNames.Count} gold={session.UserGold} bag={session.BagCount} buys={session.InputBuys} sells={session.InputSells} BuyOk={session.BuyOk} SellOk={session.SellOk}");
+        Console.WriteLine($"hud quest: info={session.QuestCatalog.Count} taken={session.TakenQuests.Count} done={session.CompletedQuestIds.Count} accepts={session.InputQuests} AcceptOk={session.QuestAcceptOk} FinishOk={session.QuestFinishOk}");
         Console.WriteLine($"hud trade: handshake={session.TradeHandshakeOk} done={session.TradeDone} partner={session.TradePartnerName ?? "-"} invite={session.TradeInviteFrom ?? "-"} goldSeen={session.TradeGoldSeen} deposit={session.TradeDepositOk}");
         Console.WriteLine($"hud drag: ok={session.DragOk} moves={session.InputDrags} merge={session.MergeOk} {session.DragEvidence ?? "-"}");
         Console.WriteLine($"hud-drag ghost={DragGhostDraws} from={session.SelectedSlot} to={session.DragHoverSlot}");
@@ -143,8 +144,19 @@ internal sealed class SceneHud : IDisposable
             Console.WriteLine($"  hud-drag {session.DragEvidence}");
         if (session.MergeEvidence != null)
             Console.WriteLine($"  hud-merge {session.MergeEvidence}");
-        foreach (string q in session.QuestNames.Take(8))
-            Console.WriteLine($"  hud-quest {q}");
+        foreach (var info in session.QuestCatalog.OrderBy(q => q.Index).Take(8))
+        {
+            string flag = session.CompletedQuestIds.Contains(info.Index) ? "done"
+                : session.TakenQuests.Any(q => q.Id == info.Index) ? "taken"
+                : "open";
+            Console.WriteLine($"  hud-quest-info id={info.Index} {flag} name={info.Name} npc={info.NPCIndex}");
+        }
+        foreach (var q in session.TakenQuests.OrderBy(q => q.Id))
+            Console.WriteLine($"  hud-quest-taken id={q.Id} name={q.QuestInfo?.Name ?? session.QuestNames.FirstOrDefault() ?? "?"} completed={q.Completed}");
+        if (session.QuestAcceptEvidence != null)
+            Console.WriteLine($"  hud-quest-accept {session.QuestAcceptEvidence}");
+        if (session.QuestFinishEvidence != null)
+            Console.WriteLine($"  hud-quest-finish {session.QuestFinishEvidence}");
     }
 
     void ResetCounts()
@@ -256,7 +268,7 @@ internal sealed class SceneHud : IDisposable
         }
         if (session.QuestNames.Count > 0)
         {
-            Text(x + 6, Math.Min(row, y + 170), $"QUEST {session.QuestNames.Count}", Color.LightGreen);
+            Text(x + 6, Math.Min(row, y + 170), $"QUEST {session.TakenQuests.Count}/{session.QuestCatalog.Count}", Color.LightGreen);
         }
         NpcDraws = HudDraws - before;
     }

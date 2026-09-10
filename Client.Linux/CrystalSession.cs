@@ -103,6 +103,19 @@ internal sealed class CrystalSession : IDisposable
     public List<string> NpcDialogLines { get; } = new();
     public List<string> NpcGoods { get; } = new();
     public List<string> QuestNames { get; } = new();
+    readonly Dictionary<int, ClientQuestInfo> _questInfo = new();
+    readonly Dictionary<int, ClientQuestProgress> _takenQuests = new();
+    readonly HashSet<int> _completedQuestIds = new();
+    int _pendingAccept = -1;
+    int _pendingFinish = -1;
+    public int InputQuests { get; private set; }
+    public bool QuestAcceptOk { get; private set; }
+    public bool QuestFinishOk { get; private set; }
+    public string? QuestAcceptEvidence { get; private set; }
+    public string? QuestFinishEvidence { get; private set; }
+    public IReadOnlyCollection<ClientQuestInfo> QuestCatalog => _questInfo.Values;
+    public IReadOnlyCollection<ClientQuestProgress> TakenQuests => _takenQuests.Values;
+    public IReadOnlyCollection<int> CompletedQuestIds => _completedQuestIds;
     public int NpcCallSent { get; private set; }
     uint _defaultNpcId;
     readonly List<UserItem> _goodsItems = new();
@@ -254,6 +267,18 @@ internal sealed class CrystalSession : IDisposable
             case GameCommandKind.Merge:
                 TryMerge(command.Slot, command.Dest);
                 break;
+            case GameCommandKind.QuestAccept:
+                TryQuestAccept(command.Slot);
+                break;
+            case GameCommandKind.QuestFinish:
+                TryQuestFinish(command.Slot, command.Dest);
+                break;
+            case GameCommandKind.QuestAbandon:
+                TryQuestAbandon(command.Slot);
+                break;
+            case GameCommandKind.QuestShare:
+                TryQuestShare(command.Slot);
+                break;
         }
     }
 
@@ -275,12 +300,14 @@ internal sealed class CrystalSession : IDisposable
             Pump(Math.Max(200, stepMs));
         }
 
-        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
+        Console.WriteLine($"input-script done walks={InputWalks} attacks={InputAttacks} talks={InputTalks} buys={InputBuys} sells={InputSells} trades={InputTrades} drags={InputDrags} quests={InputQuests} BuyOk={BuyOk} SellOk={SellOk} DragOk={DragOk} QuestAcceptOk={QuestAcceptOk} QuestFinishOk={QuestFinishOk} TradeHandshake={TradeHandshakeOk} TradeDone={TradeDone} gold={UserGold} bag={BagCount} NpcTalkOk={NpcTalkOk} partner={TradePartnerName ?? "-"} loc={UserLocation.X},{UserLocation.Y}");
         if (BuyEvidence != null) Console.WriteLine($"  buy : {BuyEvidence}");
         if (SellEvidence != null) Console.WriteLine($"  sell : {SellEvidence}");
         if (TradeEvidence != null) Console.WriteLine($"  trade : {TradeEvidence}");
         if (DragEvidence != null) Console.WriteLine($"  drag : {DragEvidence}");
         if (MergeEvidence != null) Console.WriteLine($"  merge : {MergeEvidence}");
+        if (QuestAcceptEvidence != null) Console.WriteLine($"  quest-accept : {QuestAcceptEvidence}");
+        if (QuestFinishEvidence != null) Console.WriteLine($"  quest-finish : {QuestFinishEvidence}");
         bool wantWalk = commands.Any(c => c.Kind == GameCommandKind.Walk);
         bool wantAtk = commands.Any(c => c.Kind == GameCommandKind.Attack);
         bool wantChat = commands.Any(c => c.Kind == GameCommandKind.Chat);
@@ -291,6 +318,8 @@ internal sealed class CrystalSession : IDisposable
         bool wantConfirm = commands.Any(c => c.Kind == GameCommandKind.TradeConfirm);
         bool wantDrag = commands.Any(c => c.Kind == GameCommandKind.Drag);
         bool wantMerge = commands.Any(c => c.Kind == GameCommandKind.Merge);
+        bool wantQuestAccept = commands.Any(c => c.Kind == GameCommandKind.QuestAccept);
+        bool wantQuestFinish = commands.Any(c => c.Kind == GameCommandKind.QuestFinish);
         if (wantWalk && InputWalks == 0) return 10;
         if (wantAtk && InputAttacks == 0) return 10;
         if (wantChat && ChatSent == 0) return 10;
@@ -301,6 +330,8 @@ internal sealed class CrystalSession : IDisposable
         if (wantConfirm && wantTrade && !TradeDone) return 10;
         if (wantDrag && !DragOk) return 10;
         if (wantMerge && !MergeOk) return 10;
+        if (wantQuestAccept && !QuestAcceptOk) return 10;
+        if (wantQuestFinish && !QuestFinishOk) return 10;
         return 0;
     }
 
@@ -600,6 +631,157 @@ internal sealed class CrystalSession : IDisposable
         }
         else
             Note("merge: no S.MergeItem Success");
+    }
+
+    void TryQuestAccept(int questIndex)
+    {
+        InputQuests++;
+        if (questIndex < 0)
+            questIndex = FirstAcceptableQuestId();
+        if (questIndex < 0)
+        {
+            Note("quest-accept: no NewQuestInfo id (not taken/completed)");
+            return;
+        }
+
+        uint npcId = 0;
+        string name = QuestLabel(questIndex);
+        if (_questInfo.TryGetValue(questIndex, out var info))
+            npcId = info.NPCIndex;
+
+        EnsureNearQuestNpc(npcId, questIndex, "accept");
+        if (npcId == 0 && NpcObjectId != 0)
+            npcId = NpcObjectId;
+
+        _pendingAccept = questIndex;
+        Send(new C.AcceptQuest { NPCIndex = npcId, QuestIndex = questIndex });
+        Note($"input AcceptQuest npc={npcId} id={questIndex} name={name} #{InputQuests}");
+        Pump(900);
+        if (QuestAcceptOk)
+            Note("quest-accept evidence: " + QuestAcceptEvidence);
+        else
+            Note($"quest-accept: no S.ChangeQuest Add id={questIndex} (range/level/already done?)");
+    }
+
+    void TryQuestFinish(int questIndex, int selectedItem)
+    {
+        InputQuests++;
+        if (questIndex < 0)
+            questIndex = FirstFinishableQuestId();
+        if (questIndex < 0)
+        {
+            Note("quest-finish: no taken completed quest");
+            return;
+        }
+
+        uint npcId = 0;
+        if (_questInfo.TryGetValue(questIndex, out var info))
+            npcId = info.FinishNPCIndex != 0 ? info.FinishNPCIndex : info.NPCIndex;
+
+        EnsureNearQuestNpc(npcId, questIndex, "finish");
+        _pendingFinish = questIndex;
+        Send(new C.FinishQuest { QuestIndex = questIndex, SelectedItemIndex = selectedItem });
+        Note($"input FinishQuest id={questIndex} selected={selectedItem} name={QuestLabel(questIndex)} #{InputQuests}");
+        Pump(900);
+        if (QuestFinishOk)
+            Note("quest-finish evidence: " + QuestFinishEvidence);
+        else
+            Note($"quest-finish: no S.ChangeQuest Remove id={questIndex} (not complete or out of range)");
+    }
+
+    void TryQuestAbandon(int questIndex)
+    {
+        InputQuests++;
+        Send(new C.AbandonQuest { QuestIndex = questIndex });
+        Note($"input AbandonQuest id={questIndex} #{InputQuests}");
+        Pump(600);
+    }
+
+    void TryQuestShare(int questIndex)
+    {
+        InputQuests++;
+        Send(new C.ShareQuest { QuestIndex = questIndex });
+        Note($"input ShareQuest id={questIndex} #{InputQuests}");
+        Pump(400);
+    }
+
+    int FirstAcceptableQuestId()
+    {
+        foreach (var info in _questInfo.Values.OrderBy(q => q.Index))
+        {
+            if (_takenQuests.ContainsKey(info.Index) || _completedQuestIds.Contains(info.Index))
+                continue;
+            if (FindQuestNpc(info.NPCIndex, info.Index) != null)
+                return info.Index;
+        }
+
+        foreach (var info in _questInfo.Values.OrderBy(q => q.Index))
+        {
+            if (!_takenQuests.ContainsKey(info.Index) && !_completedQuestIds.Contains(info.Index))
+                return info.Index;
+        }
+
+        return -1;
+    }
+
+    int FirstFinishableQuestId()
+    {
+        foreach (var q in _takenQuests.Values.OrderBy(q => q.Id))
+        {
+            if (q.Completed)
+                return q.Id;
+        }
+
+        return _takenQuests.Keys.OrderBy(id => id).FirstOrDefault(-1);
+    }
+
+    string QuestLabel(int id)
+    {
+        if (_questInfo.TryGetValue(id, out var info) && !string.IsNullOrWhiteSpace(info.Name))
+            return info.Name;
+        if (_takenQuests.TryGetValue(id, out var taken) && taken.QuestInfo != null)
+            return taken.QuestInfo.Name;
+        return "?";
+    }
+
+    WorldObject? FindQuestNpc(uint objectId, int questIndex)
+    {
+        if (objectId != 0 && _objects.TryGetValue(objectId, out var byId) && byId.Kind == "npc")
+            return byId;
+        return _objects.Values.FirstOrDefault(o =>
+            o.Kind == "npc" && o.QuestIDs.Contains(questIndex));
+    }
+
+    void EnsureNearQuestNpc(uint objectId, int questIndex, string why)
+    {
+        var npc = FindQuestNpc(objectId, questIndex);
+        if (npc == null)
+        {
+            Note($"quest-{why}: NPC id={objectId} not in view; @MOVE 289 617 (Talk BorderVillage)");
+            Chat("@MOVE 289 617");
+            Pump(900);
+            npc = FindQuestNpc(objectId, questIndex);
+        }
+
+        if (npc == null)
+        {
+            Note($"quest-{why}: still no ObjectNPC for quest {questIndex}");
+            return;
+        }
+
+        NpcName = npc.Name;
+        NpcObjectId = npc.ObjectID;
+        if (!Functions.InRange(UserLocation, npc.Location, Globals.DataRange))
+        {
+            Note($"quest-{why}: approach {npc.Name} {npc.Location.X},{npc.Location.Y} from {UserLocation.X},{UserLocation.Y}");
+            WalkToward(npc.Location, 16);
+        }
+
+        if (!Functions.InRange(UserLocation, npc.Location, Globals.DataRange))
+        {
+            Chat($"@MOVE {npc.Location.X} {npc.Location.Y}");
+            Pump(700);
+        }
     }
 
     void ApplyInventorySwap(int from, int to)
@@ -1211,9 +1393,56 @@ internal sealed class CrystalSession : IDisposable
                 }
                 break;
             case S.NewQuestInfo nq when nq.Info != null:
-                if (QuestNames.Count < 12 && !string.IsNullOrWhiteSpace(nq.Info.Name))
+                _questInfo[nq.Info.Index] = nq.Info;
+                if (!string.IsNullOrWhiteSpace(nq.Info.Name) && !QuestNames.Contains(nq.Info.Name))
                     QuestNames.Add(nq.Info.Name);
-                Note($"NewQuestInfo {nq.Info.Index} {nq.Info.Name}");
+                Note($"NewQuestInfo {nq.Info.Index} {nq.Info.Name} npc={nq.Info.NPCIndex} finish={nq.Info.FinishNPCIndex} lv={nq.Info.MinLevelNeeded}");
+                break;
+            case S.ChangeQuest cq when cq.Quest != null:
+            {
+                var prog = cq.Quest;
+                if (prog.QuestInfo == null && _questInfo.TryGetValue(prog.Id, out var bound))
+                    prog.QuestInfo = bound;
+                string qname = prog.QuestInfo?.Name ?? QuestLabel(prog.Id);
+                switch (cq.QuestState)
+                {
+                    case QuestState.Add:
+                    case QuestState.Update:
+                        _takenQuests[prog.Id] = prog;
+                        if (cq.QuestState == QuestState.Add && _pendingAccept == prog.Id)
+                        {
+                            QuestAcceptOk = true;
+                            QuestAcceptEvidence = $"AcceptQuest id={prog.Id} name={qname} S.ChangeQuest Add taken={prog.Taken} completed={prog.Completed}";
+                            Note(QuestAcceptEvidence);
+                        }
+                        break;
+                    case QuestState.Remove:
+                        _takenQuests.Remove(prog.Id);
+                        if (_pendingFinish == prog.Id)
+                        {
+                            QuestFinishOk = true;
+                            QuestFinishEvidence = $"FinishQuest id={prog.Id} name={qname} S.ChangeQuest Remove";
+                            Note(QuestFinishEvidence);
+                        }
+                        break;
+                }
+                Note($"ChangeQuest {cq.QuestState} id={prog.Id} name={qname} taken={prog.Taken} completed={prog.Completed} track={cq.TrackQuest}");
+                break;
+            }
+            case S.CompleteQuest cq:
+                _completedQuestIds.Clear();
+                foreach (int id in cq.CompletedQuests)
+                    _completedQuestIds.Add(id);
+                Note($"CompleteQuest count={_completedQuestIds.Count} ids={string.Join(',', _completedQuestIds.Take(8))}");
+                break;
+            case S.GainedQuestItem gq when gq.Item != null:
+                Note($"GainedQuestItem uid={gq.Item.UniqueID} index={gq.Item.ItemIndex} name={ItemName(gq.Item)} x{gq.Item.Count}");
+                break;
+            case S.DeleteQuestItem dq:
+                Note($"DeleteQuestItem uid={dq.UniqueID} count={dq.Count}");
+                break;
+            case S.ShareQuest sq:
+                Note($"ShareQuest id={sq.QuestIndex} from={sq.SharerName}");
                 break;
             case S.NewMagic nm when nm.Magic != null && !nm.Hero:
                 _magics.Add(nm.Magic);

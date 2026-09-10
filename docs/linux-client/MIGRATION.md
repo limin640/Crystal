@@ -196,7 +196,7 @@ Catalog **86** missing slots stay pack-missing (listed, not synthesized). Do not
 | NPC talk (`C.CallNPC` `[@Main]` / `S.NPCResponse`) | **In progress** — IRenderer name + dialog lines |
 | NPC goods (`S.NPCGoods`) | **In progress** — list after `[@BUY]`/`[@BUYSELL]` |
 | NPC buy / sell (`C.BuyItem` / `C.SellItem`) | **In progress** — `--input-script Talk,Buy:0,Sell` uses existing `NPCGoods` UniqueIDs; gold/bag in logs + HUD |
-| Quest panel | **In progress** only as names from `S.NewQuestInfo` if they arrive; no accept/turn-in UI |
+| Quest panel | **In progress** — `S.NewQuestInfo` catalog + taken/done from `S.ChangeQuest` / `S.CompleteQuest`. `--input-script QuestAccept:id` / `QuestFinish:id` → `C.AcceptQuest` / `C.FinishQuest` (same as WinForms `QuestListDialog`). Approaches the Jev giver via ObjectNPC / Talk `@MOVE 289 617` |
 | Player trade | **In progress** — two Client.Linux processes (`docs/linux-client/trade-two-process.sh`). `C.ChangeTrade` / `C.TradeRequest` / `C.TradeReply` / `C.TradeGold` / `C.DepositTradeItem` / `C.TradeConfirm` + matching `S.*`. Players must face each other. |
 | Inventory bag move (`C.MoveItem` / `C.MergeItem`) | **In progress** — `--input-script Drag:0,8` / `Merge:from,to`; HUD slot refresh. Same packets as `MirItemCell` |
 | Mouse-drag chrome (SelectedCell ghost / click-to-drop) | **In progress** — IRenderer colored-quad ghost + source/dest highlight on `Drag`. Windowed left-click pick/drop on bag/belt if Silk.NET mouse coords exist. Headless keeps `Drag:from,to` tokens. **No WIL item icons** |
@@ -496,6 +496,14 @@ FightHit=True LootOk=True EquipOk=True
 sound: backend=Null (headless) SoundPlayOk=False skipped=headless
 ```
 
+### Quest accept / turn-in (2026-09-10, same VM)
+
+Same packets as WinForms `QuestListDialog`: `C.AcceptQuest` `{ NPCIndex, QuestIndex }`, `C.FinishQuest` `{ QuestIndex, SelectedItemIndex }`. Catalog from `S.NewQuestInfo`; taken/done from `S.ChangeQuest` / `S.CompleteQuest`. Headless tokens `QuestAccept` / `QuestFinish` (optional `:id`). Approaches the giver already in view or via Talk `@MOVE 289 617`. No invented quest files.
+
+**Input-script** `--no-gate --input-script QuestAccept,QuestFinish`: evidence pending this run.
+
+**Hard-gate** (no `--input-script`): must stay **EXIT:0** with `quests=0` `AcceptOk=False`.
+
 ## Remaining residuals (checklist)
 
 These do **not** block the hard-gate (login→select→walk→fight→loot→equip **EXIT:0**). Do not invent WIL/game art to close them.
@@ -504,7 +512,7 @@ These do **not** block the hard-gate (login→select→walk→fight→loot→equ
 - [ ] **WebView2** — Windows-only (WinForms Evergreen; no Linux runtime). Permanently deferred on Linux. `Client.Linux` must never reference it.
 - [ ] **WIL item icons** — `Items` / `StateItem` / `DNItems` catalog sheets. Colored-quad SelectedCell ghost is the Linux stand-in. Catalog **86** slots stay pack-missing (listed, not synthesized).
 - [ ] **`MMap.Lib` / MagIcon tiles** — mini-map stays geometry; skill bar stays 8 stubs. No invented map or spell art.
-- [ ] **Quest accept / turn-in UI** — names from `S.NewQuestInfo` only; no `C.AcceptQuest` / complete flow.
+- [x] **Quest accept / turn-in** — `C.AcceptQuest` / `C.FinishQuest` / `C.AbandonQuest` / `C.ShareQuest` + `S.ChangeQuest` / `S.CompleteQuest`. HUD lists available/taken. Leftover: no WinForms quest diary chrome / select-reward picker UI (script uses `QuestFinish:id,selected`).
 - [x] **Windows `SoundManager` → `IAudio` fold** — `SoundManager` calls `IAudio` (NAudio backend). Leftover: GameScene still uses the index API (`PlaySound(int)` / `SoundList.lst`), not raw paths; `WaveOutEvent` is Windows-runtime; `Client.csproj` still does not build on Linux (SlimDX / WinForms / WebView2).
 - [ ] **Version hash** — `--no-version-check` unless a real `Mir2.Exe` hash list is supplied.
 - [ ] **Operator art / Data / Jev / Sound packs** — stay outside git. `--data` / `--maps` / `--sound` / `--root` point at external trees. Do not vendor bake atlases.

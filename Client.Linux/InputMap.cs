@@ -184,6 +184,62 @@ internal static class InputMap
             return false;
         }
 
+        if (t.Equals("QuestAccept", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("QuestAccept:", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("AcceptQuest", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("AcceptQuest:", StringComparison.OrdinalIgnoreCase))
+        {
+            int id = -1;
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+                int.TryParse(t[(colon + 1)..].Trim(), out id);
+            command = GameCommand.QuestAccept(id);
+            return true;
+        }
+
+        if (t.Equals("QuestFinish", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("QuestFinish:", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("FinishQuest", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("FinishQuest:", StringComparison.OrdinalIgnoreCase))
+        {
+            int id = -1, selected = -1;
+            int colon = t.IndexOf(':');
+            if (colon >= 0)
+            {
+                string[] parts = t[(colon + 1)..].Split(new[] { ',', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 1)
+                    int.TryParse(parts[0].Trim(), out id);
+                if (parts.Length >= 2)
+                    int.TryParse(parts[1].Trim(), out selected);
+            }
+            command = GameCommand.QuestFinish(id, selected);
+            return true;
+        }
+
+        if (t.StartsWith("QuestAbandon:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("AbandonQuest:", StringComparison.OrdinalIgnoreCase))
+        {
+            int colon = t.IndexOf(':');
+            if (colon >= 0 && int.TryParse(t[(colon + 1)..].Trim(), out int id))
+            {
+                command = GameCommand.QuestAbandon(id);
+                return true;
+            }
+            return false;
+        }
+
+        if (t.StartsWith("QuestShare:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("ShareQuest:", StringComparison.OrdinalIgnoreCase))
+        {
+            int colon = t.IndexOf(':');
+            if (colon >= 0 && int.TryParse(t[(colon + 1)..].Trim(), out int id))
+            {
+                command = GameCommand.QuestShare(id);
+                return true;
+            }
+            return false;
+        }
+
         if (t.Equals("Talk", StringComparison.OrdinalIgnoreCase)
             || t.Equals("NPC", StringComparison.OrdinalIgnoreCase)
             || t.Equals("Npc", StringComparison.OrdinalIgnoreCase))

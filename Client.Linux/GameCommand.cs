@@ -21,7 +21,11 @@ internal enum GameCommandKind
     Wait,
     Move,
     Drag,
-    Merge
+    Merge,
+    QuestAccept,
+    QuestFinish,
+    QuestAbandon,
+    QuestShare
 }
 
 internal readonly struct GameCommand
@@ -50,4 +54,8 @@ internal readonly struct GameCommand
     public static GameCommand Move(int x, int y) => new() { Kind = GameCommandKind.Move, Text = $"{x} {y}", Slot = 0 };
     public static GameCommand Drag(int from = -1, int to = -1) => new() { Kind = GameCommandKind.Drag, Text = "", Slot = from, Dest = to };
     public static GameCommand Merge(int from, int to) => new() { Kind = GameCommandKind.Merge, Text = "", Slot = from, Dest = to };
+    public static GameCommand QuestAccept(int questIndex = -1) => new() { Kind = GameCommandKind.QuestAccept, Text = "", Slot = questIndex };
+    public static GameCommand QuestFinish(int questIndex = -1, int selectedItem = -1) => new() { Kind = GameCommandKind.QuestFinish, Text = "", Slot = questIndex, Dest = selectedItem };
+    public static GameCommand QuestAbandon(int questIndex) => new() { Kind = GameCommandKind.QuestAbandon, Text = "", Slot = questIndex };
+    public static GameCommand QuestShare(int questIndex) => new() { Kind = GameCommandKind.QuestShare, Text = "", Slot = questIndex };
 }

@@ -148,7 +148,7 @@ dotnet run --project Client.Linux/Client.Linux.csproj -c Release -- \
 | `--character` | Name for `C.NewCharacter` if the account has no chars (default `LinuxWar`) |
 | `--no-walk` | Do not send the scripted `C.Walk` after enter |
 | `--no-gate` | Stop after walk (skip scripted Attack / PickUp / EquipItem) |
-| `--input-script` | After StartGame, inject Crystal keys. `Drag` / `Drag:0,8` → `C.MoveItem` (`MirGridType.Inventory`) and IRenderer SelectedCell ghost (colored quads, no WIL icons); `Merge:0,1` → `C.MergeItem`. Map teleport stays `Move:x:y` (`@MOVE`). Windowed left-click pick/drop on bag/belt when mouse coords exist. |
+| `--input-script` | After StartGame, inject Crystal keys. `QuestAccept` / `QuestAccept:id` → `C.AcceptQuest`; `QuestFinish` / `QuestFinish:id` → `C.FinishQuest` (same packets as `QuestListDialog`). `Drag` / `Drag:0,8` → `C.MoveItem`; `Merge:0,1` → `C.MergeItem`. Map teleport stays `Move:x:y` (`@MOVE`). |
 | `--auto-trade-reply` | On `S.TradeRequest`, send `C.TradeReply` `AcceptInvite=true` |
 | `--auto-trade-confirm` | On `S.TradeGold` / `S.TradeItem`, send `C.TradeConfirm` `Locked=true` |
 | `--keep-alive <ms>` | Pump after the input script so a second client can finish the trade |
