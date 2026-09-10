@@ -575,7 +575,21 @@ When hashes load, Server.Linux sets `CheckVersion=true` unless `--no-version-che
 
 Local pair (no Windows exe on the box): both sides hash `Client.Linux/bin/Release/net8.0/Crystal.Client.Linux.dll`. Operator with a real `Mir2.Exe`: point both flags at that file (hash only).
 
-**Hard-gate** Server **without** `--no-version-check`, with `--version-path` + Client default file: **EXIT:0** — `CheckVersion=True` `VersionCheckOk=True` `Result=1`.
+**Hard-gate** Server **without** `--no-version-check` (`--version-path …/Crystal.Client.Linux.dll --allow-start-game --test-server`): **EXIT:0**
+
+```
+CheckVersion=True VersionPath=…/Crystal.Client.Linux.dll hashes=1
+version-hash[0]=be802de59906a44ee66f52d365ff91a9
+version: src=…/Crystal.Client.Linux.dll md5=be802de59906a44ee66f52d365ff91a9 bytes=16
+handshake: ClientVersion Result=1 (match) VersionCheckOk=True
+VersionCheckOk=True VersionResult=1
+FightHit=True FightDied=False LootOk=True EquipOk=True
+  fight : ObjectStruck id=58296 by self
+  loot  : PickUp ground (HP)DrugSmall at 288,612 bag=2
+  equip : EquipItem Success slot=Weapon name=WoodenSword uid=1
+```
+
+`--no-version-check` was not passed. Stock Jev `Setup.ini` `CheckVersion=False` was overridden for the process only (not written back).
 
 ## Remaining residuals (checklist)
 

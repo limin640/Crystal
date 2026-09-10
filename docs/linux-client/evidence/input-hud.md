@@ -270,7 +270,14 @@ Operator pack: `--data /path/to/Crystal/Data` (do not vendor). Bake fixture cata
 
 Same MD5-of-file as WinForms. Server `--version-path` / Client `--version-file` (default `Crystal.Client.Linux.dll`). `--no-version-check` is opt-out. Do not vendor `Mir2.Exe`.
 
-**Hard-gate** without `--no-version-check`, `CheckVersion=True`: **EXIT:0** — `VersionCheckOk=True` `Result=1`.
+**Hard-gate** Server `--version-path …/Crystal.Client.Linux.dll` (no `--no-version-check`): **EXIT:0**
+
+```
+CheckVersion=True hashes=1
+version: src=…/Crystal.Client.Linux.dll md5=be802de59906a44ee66f52d365ff91a9
+handshake: ClientVersion Result=1 (match) VersionCheckOk=True
+FightHit=True LootOk=True EquipOk=True
+```
 
 ## Catalog 86 / deferred
 
